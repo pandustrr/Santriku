@@ -33,7 +33,7 @@ Aplikasi ini membagi hak akses dan fitur menjadi 3 peranan utama:
 
 ---
 
-## Struktur Proyek (Clean Architecture - Feature First)
+## Struktur Proyek 
 
 Proyek ini menggunakan struktur folder modular untuk memudahkan perluasan fitur (scalability) di masa depan:
 
