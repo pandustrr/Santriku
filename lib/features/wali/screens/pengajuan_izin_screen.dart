@@ -131,7 +131,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
 
                   // Pilih Santri
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedSantri,
+                    value: _selectedSantri,
                     decoration: InputDecoration(
                       labelText: 'PILIH SANTRI',
                       labelStyle: GoogleFonts.poppins(
