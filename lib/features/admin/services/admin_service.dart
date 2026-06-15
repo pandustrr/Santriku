@@ -259,4 +259,50 @@ class AdminService {
       return [];
     }
   }
+
+  /// Get target pesantren GPS coordinates/settings
+  static Future<Map<String, dynamic>> getSettings() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/settings'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Update target pesantren GPS coordinates/settings
+  static Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> data) async {
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.baseUrl}/admin/settings'),
+        headers: _headers,
+        body: jsonEncode(data),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': body['message'] ?? 'Pengaturan GPS berhasil diperbarui',
+          'settings': body['settings'],
+        };
+      }
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Gagal memperbarui pengaturan GPS',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Kesalahan jaringan: $e',
+      };
+    }
+  }
 }

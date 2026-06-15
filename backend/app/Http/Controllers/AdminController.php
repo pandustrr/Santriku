@@ -283,4 +283,62 @@ class AdminController extends Controller
 
         return response()->json($report);
     }
+
+    /**
+     * Get target pesantren GPS coordinates/settings.
+     */
+    public function getSettings()
+    {
+        $filePath = storage_path('app/settings.json');
+        if (file_exists($filePath)) {
+            $data = json_decode(file_get_contents($filePath), true);
+        } else {
+            // Default: Fasilkom UNEJ
+            $data = [
+                'name' => 'Fasilkom Universitas Jember',
+                'latitude' => -8.164667,
+                'longitude' => 113.717056,
+                'radius' => 100.0,
+            ];
+            if (!is_dir(dirname($filePath))) {
+                mkdir(dirname($filePath), 0755, true);
+            }
+            file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT));
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * Update target pesantren GPS coordinates/settings.
+     */
+    public function updateSettings(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'required|numeric|min:10',
+        ]);
+
+        $data = [
+            'name' => $request->name,
+            'latitude' => (float)$request->latitude,
+            'longitude' => (float)$request->longitude,
+            'radius' => (float)$request->radius,
+        ];
+
+        $filePath = storage_path('app/settings.json');
+        if (!is_dir(dirname($filePath))) {
+            mkdir(dirname($filePath), 0755, true);
+        }
+        file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT));
+
+        return response()->json([
+            'message' => 'Pengaturan GPS berhasil diperbarui',
+            'settings' => $data
+        ]);
+    }
 }

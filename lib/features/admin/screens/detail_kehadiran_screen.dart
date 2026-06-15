@@ -253,7 +253,7 @@ class _DetailKehadiranScreenState extends State<DetailKehadiranScreen>
             physics: const NeverScrollableScrollPhysics(),
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.4,
             children: [
               _buildStatCard('Hadir', _totalHadir, Icons.check_circle_outline_rounded, AppColors.success, const Color(0xFF1B5E20)),
               _buildStatCard('Sakit', _totalSakit, Icons.local_hospital_outlined, AppColors.accent, const Color(0xFF4E2E00)),
@@ -281,7 +281,7 @@ class _DetailKehadiranScreenState extends State<DetailKehadiranScreen>
 
   Widget _buildStatCard(String label, int count, IconData icon, Color color, Color bgColor) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
@@ -289,36 +289,38 @@ class _DetailKehadiranScreenState extends State<DetailKehadiranScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                '$count',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                child: Icon(icon, color: color, size: 16),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$count',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
