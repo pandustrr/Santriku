@@ -1,11 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import 'package:santriku_app/core/core.dart';
+import 'package:santriku_app/features/auth/services/auth_service.dart';
 import 'absensi_result_screen.dart';
 
 /// Halaman Scan QR Code untuk Absensi & Jatah Konsumsi.
-///
-/// Didesain interaktif dan presisi mengikuti Gambar 4.3 (Proses Scan QR Code).
 class ScanQrScreen extends StatefulWidget {
   final bool isAbsensi;
 
@@ -18,7 +20,14 @@ class ScanQrScreen extends StatefulWidget {
 class _ScanQrScreenState extends State<ScanQrScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _laserController;
-  bool _hasScanned = false; // Mulai dalam mode belum scan
+  bool _hasScanned = false;
+  bool _isLoading = false;
+
+  // Selected Coordinates & Location Info
+  double _selectedLat = -8.12345;
+  double _selectedLon = 113.12345;
+  String _selectedLocationName = 'Simulasi: Di Dalam Pesantren';
+  bool _geofenceOk = true;
 
   @override
   void initState() {
@@ -38,11 +47,147 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     super.dispose();
   }
 
-  void _triggerScanSimulation() {
+  void _showSimulationOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pilih Mode Pemindaian QR',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Gunakan koordinat di bawah untuk menguji geofencing:',
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 20),
+              
+              // 1. Di Dalam Pesantren
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline_rounded, color: AppColors.success),
+                title: Text('Di Dalam Pesantren (Sukses)', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text('Latitude: -8.12345, Longitude: 113.12345', style: GoogleFonts.poppins(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _triggerScanSimulation(
+                    lat: -8.12345,
+                    lon: 113.12345,
+                    locName: 'Simulasi: Di Dalam Pesantren',
+                    isOk: true,
+                  );
+                },
+              ),
+              const Divider(height: 1),
+
+              // 2. Di Luar Pesantren
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined, color: AppColors.error),
+                title: Text('Di Luar Pesantren (Gagal Geofence)', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text('Latitude: -8.20000, Longitude: 113.12345', style: GoogleFonts.poppins(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _triggerScanSimulation(
+                    lat: -8.20000,
+                    lon: 113.12345,
+                    locName: 'Simulasi: Di Luar Pesantren (Jauh)',
+                    isOk: false,
+                  );
+                },
+              ),
+              const Divider(height: 1),
+
+              // 3. GPS Asli Perangkat
+              ListTile(
+                leading: const Icon(Icons.my_location_rounded, color: AppColors.info),
+                title: Text('Gunakan GPS Asli Laptop/HP', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text('Membaca koordinat riil perangkat secara langsung.', style: GoogleFonts.poppins(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _useRealGps();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _triggerScanSimulation({
+    required double lat,
+    required double lon,
+    required String locName,
+    required bool isOk,
+  }) {
     _laserController.stop();
     setState(() {
+      _selectedLat = lat;
+      _selectedLon = lon;
+      _selectedLocationName = locName;
+      _geofenceOk = isOk;
       _hasScanned = true;
     });
+  }
+
+  Future<void> _useRealGps() async {
+    setState(() => _isLoading = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'GPS/Layanan lokasi dinonaktifkan di perangkat Anda.';
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Izin lokasi ditolak.';
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Izin lokasi ditolak permanen. Silakan aktifkan di pengaturan.';
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      
+      // Calculate distance from center (-8.12345, 113.12345)
+      double distance = Geolocator.distanceBetween(-8.12345, 113.12345, position.latitude, position.longitude);
+      bool isOk = distance <= 100.0;
+
+      _laserController.stop();
+      setState(() {
+        _selectedLat = position.latitude;
+        _selectedLon = position.longitude;
+        _selectedLocationName = 'GPS Riil: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+        _geofenceOk = isOk;
+        _hasScanned = true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengambil GPS: $e'), backgroundColor: AppColors.error),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _resetScan() {
@@ -52,53 +197,120 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     });
   }
 
-  void _saveData() {
-    final now = DateTime.now();
-    final formattedTime =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+  Future<void> _saveData() async {
+    setState(() => _isLoading = true);
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => AbsensiResultScreen(
-          isAbsensi: widget.isAbsensi,
-          santriName: 'Ahmad Fauzi',
-          status: widget.isAbsensi ? 'Hadir' : 'Makan Malam',
-          timestamp: formattedTime,
-          isSuccess: true,
-        ),
-      ),
-    );
+    try {
+      final String urlPath = widget.isAbsensi ? 'attendance' : 'consumption';
+      final Map<String, dynamic> requestBody = widget.isAbsensi
+          ? {
+              'qr_token': 'santri_ahmad_fauzi_10101',
+              'latitude': _selectedLat,
+              'longitude': _selectedLon,
+              'status': 'Hadir',
+            }
+          : {
+              'qr_token': 'santri_ahmad_fauzi_10101',
+              'jenis_makan': 'Malam',
+            };
+
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}/pengurus/$urlPath'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${AuthService.token}',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      final data = jsonDecode(response.body);
+      final now = DateTime.now();
+      final formattedTime =
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        if (response.statusCode == 201) {
+          final String displayName = widget.isAbsensi
+              ? (data['absensi']['santri_name'] ?? 'Ahmad Fauzi')
+              : (data['consumption']['santri_name'] ?? 'Ahmad Fauzi');
+          final String displayStatus = widget.isAbsensi
+              ? (data['absensi']['status'] ?? 'Hadir')
+              : 'Makan Malam Berhasil';
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => AbsensiResultScreen(
+                isAbsensi: widget.isAbsensi,
+                santriName: displayName,
+                status: displayStatus,
+                timestamp: formattedTime,
+                isSuccess: true,
+              ),
+            ),
+          );
+        } else {
+          // Failure (e.g. 400 Duplicate, 422 Out of range)
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AbsensiResultScreen(
+                isAbsensi: widget.isAbsensi,
+                santriName: 'Ahmad Fauzi',
+                status: data['message'] ?? 'Proses gagal.',
+                timestamp: formattedTime,
+                isSuccess: false,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Kesalahan jaringan: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F6), // Background off-white
+      backgroundColor: const Color(0xFFF5F7F6),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildCustomAppBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildScannerBox(),
-                    const SizedBox(height: 18),
-                    if (!_hasScanned) _buildSimulationTriggerCard(),
-                    if (_hasScanned) ...[
-                      if (widget.isAbsensi) _buildAbsensiDetails() else _buildKonsumsiDetails(),
-                      const SizedBox(height: 80), // Spacer untuk menghindari overlap button
-                    ],
-                  ],
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
                 ),
+              )
+            : Column(
+                children: [
+                  _buildCustomAppBar(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildScannerBox(),
+                          const SizedBox(height: 18),
+                          if (!_hasScanned) _buildSimulationTriggerCard(),
+                          if (_hasScanned) ...[
+                            if (widget.isAbsensi) _buildAbsensiDetails() else _buildKonsumsiDetails(),
+                            const SizedBox(height: 80),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
-      bottomSheet: _hasScanned ? _buildBottomSheetButtons() : null,
+      bottomSheet: (_hasScanned && !_isLoading) ? _buildBottomSheetButtons() : null,
     );
   }
 
@@ -108,7 +320,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: Container(
@@ -135,7 +346,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             ),
           ),
           const SizedBox(width: 16),
-          // Title & Subtitle
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -162,21 +372,18 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     );
   }
 
-  // ── Scanner Box with Laser Animation ────────────────────
+  // ── Scanner Box ────────────────────
   Widget _buildScannerBox() {
     return Container(
       width: double.infinity,
       height: 180,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F2D26), // Dark green background
+        color: const Color(0xFF0F2D26),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Stack(
         children: [
-          // Yellow Brackets (Bidik)
           _buildScannerBrackets(),
-
-          // Laser Scanner line
           if (!_hasScanned)
             AnimatedBuilder(
               animation: _laserController,
@@ -201,8 +408,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                 );
               },
             ),
-
-          // Center Bidik Overlay
           Center(
             child: Container(
               width: 90,
@@ -213,8 +418,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
               ),
             ),
           ),
-
-          // Text Instruction inside Scanner Box
           Positioned(
             bottom: 20,
             left: 0,
@@ -243,7 +446,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
       padding: const EdgeInsets.all(24),
       child: Stack(
         children: [
-          // Top Left
           Positioned(
             top: 0,
             left: 0,
@@ -254,8 +456,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             left: 0,
             child: Container(width: thick, height: size, color: color),
           ),
-
-          // Top Right
           Positioned(
             top: 0,
             right: 0,
@@ -266,8 +466,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             right: 0,
             child: Container(width: thick, height: size, color: color),
           ),
-
-          // Bottom Left
           Positioned(
             bottom: 0,
             left: 0,
@@ -278,8 +476,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             left: 0,
             child: Container(width: thick, height: size, color: color),
           ),
-
-          // Bottom Right
           Positioned(
             bottom: 0,
             right: 0,
@@ -330,7 +526,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Klik tombol di bawah untuk menyimulasikan pembacaan QR Code kartu santri.',
+            'Klik tombol di bawah untuk menyimulasikan pembacaan QR Code kartu santri dengan opsi lokasi.',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               color: Colors.grey[500],
@@ -342,7 +538,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: _triggerScanSimulation,
+              onPressed: _showSimulationOptions,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF104A3E),
                 foregroundColor: Colors.white,
@@ -351,7 +547,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                 ),
               ),
               child: Text(
-                'Simulasi Scan QR',
+                'Mulai Pindai QR',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
               ),
             ),
@@ -384,31 +580,41 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F2EF),
+                decoration: BoxDecoration(
+                  color: _geofenceOk ? const Color(0xFFE8F2EF) : const Color(0xFFFDE8E8),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.location_on_outlined,
-                  color: Color(0xFF2A8B72),
+                  color: _geofenceOk ? const Color(0xFF2A8B72) : AppColors.error,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  'Gerbang Utama Pesantren',
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFF1E2925),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _selectedLocationName,
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF1E2925),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Lat: ${_selectedLat.toStringAsFixed(5)} • Lon: ${_selectedLon.toStringAsFixed(5)}',
+                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[550]),
+                    )
+                  ],
                 ),
               ),
               Text(
-                'GPS OK',
+                _geofenceOk ? 'GPS OK' : 'GPS OUT',
                 style: GoogleFonts.poppins(
-                  color: const Color(0xFF2A8B72),
+                  color: _geofenceOk ? const Color(0xFF2A8B72) : AppColors.error,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -419,7 +625,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
 
         const SizedBox(height: 24),
 
-        // Section Title: SANTRI TERBACA
         Text(
           'SANTRI TERBACA',
           style: GoogleFonts.poppins(
@@ -431,15 +636,13 @@ class _ScanQrScreenState extends State<ScanQrScreen>
         ),
         const SizedBox(height: 10),
 
-        // Santri Profile Card
         _buildSantriProfileCard(),
 
         const SizedBox(height: 14),
 
-        // Checklist Status Items
         _buildStatusCheckRow('QR kartu santri terbaca', true),
         const SizedBox(height: 8),
-        _buildStatusCheckRow('Lokasi & Geofence sesuai', true),
+        _buildStatusCheckRow('Lokasi & Geofence sesuai', _geofenceOk),
         const SizedBox(height: 8),
         _buildStatusCheckRow('Waktu absen tercatat', true),
       ],
@@ -451,12 +654,8 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Santri Profile Card
         _buildSantriProfileCard(),
-
         const SizedBox(height: 24),
-
-        // Section Title: JATAH HARI INI
         Text(
           'JATAH HARI INI',
           style: GoogleFonts.poppins(
@@ -467,8 +666,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
           ),
         ),
         const SizedBox(height: 12),
-
-        // Meal Row
         Row(
           children: [
             _buildMealItemCard('Sarapan', 'Diambil', Icons.local_cafe_outlined, true),
@@ -478,10 +675,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             _buildMealItemCard('Malam', 'Tersedia', Icons.nightlight_round_outlined, false),
           ],
         ),
-
         const SizedBox(height: 18),
-
-        // Card Sisa Jatah
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -528,7 +722,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                   ),
                 ],
               ),
-              // Fork & Spoon background icon on the right
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -546,7 +739,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     );
   }
 
-  // Helper Santri Profile Card
   Widget _buildSantriProfileCard() {
     return Container(
       decoration: BoxDecoration(
@@ -590,7 +782,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'NIS 23.0142 • XI-A',
+                  'NIS 10101',
                   style: GoogleFonts.poppins(
                     color: Colors.grey[500],
                     fontSize: 11,
@@ -602,12 +794,12 @@ class _ScanQrScreenState extends State<ScanQrScreen>
           ),
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2A8B72),
+            decoration: BoxDecoration(
+              color: _geofenceOk ? const Color(0xFF2A8B72) : AppColors.error,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.check_rounded,
+            child: Icon(
+              _geofenceOk ? Icons.check_rounded : Icons.close_rounded,
               color: Colors.white,
               size: 14,
             ),
@@ -617,7 +809,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     );
   }
 
-  // Helper Checklist Row
   Widget _buildStatusCheckRow(String label, bool isOk) {
     return Container(
       decoration: BoxDecoration(
@@ -663,7 +854,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     );
   }
 
-  // Helper Meal Item Card Builder
   Widget _buildMealItemCard(String meal, String status, IconData icon, bool isTaken) {
     return Expanded(
       child: Container(
@@ -704,19 +894,16 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     );
   }
 
-  // ── Bottom Sheet Action Buttons ─────────────────────────
   Widget _buildBottomSheetButtons() {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 20),
       child: Row(
         children: [
-          // Left Small Button
           ElevatedButton(
             onPressed: widget.isAbsensi
                 ? _resetScan
                 : () {
-                    // Tolak jatah konsumsi — navigasi ke result gagal
                     final now = DateTime.now();
                     final formattedTime =
                         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
@@ -763,8 +950,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
             ),
           ),
           const SizedBox(width: 12),
-
-          // Right Large Expanded Button
           Expanded(
             child: ElevatedButton.icon(
               onPressed: _saveData,

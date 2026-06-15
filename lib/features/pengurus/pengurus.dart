@@ -10,3 +10,5 @@ export 'screens/detail_izin_screen.dart';
 export 'screens/stok_konsumsi_screen.dart';
 export 'screens/notifikasi_screen.dart';
 export 'screens/profil_santri_screen.dart';
+export 'services/pengurus_service.dart';
+

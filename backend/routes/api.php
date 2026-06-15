@@ -32,3 +32,16 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::put('santri/{id}', [AdminController::class, 'updateSantri']);
     Route::delete('santri/{id}', [AdminController::class, 'destroySantri']);
 });
+
+use App\Http\Controllers\PengurusController;
+
+Route::middleware(['auth:sanctum'])->prefix('pengurus')->group(function () {
+    Route::post('attendance', [PengurusController::class, 'storeAttendance']);
+    Route::post('consumption', [PengurusController::class, 'storeConsumption']);
+    Route::get('permissions', [PengurusController::class, 'getPermissions']);
+    Route::put('permissions/{id}', [PengurusController::class, 'updatePermissionStatus']);
+    Route::get('consumption-stats', [PengurusController::class, 'getConsumptionStats']);
+    Route::post('consumption-stats', [PengurusController::class, 'storeConsumptionStats']);
+    Route::get('dashboard-stats', [PengurusController::class, 'getDashboardStats']);
+    Route::get('activity-logs', [PengurusController::class, 'getActivityLogs']);
+});
