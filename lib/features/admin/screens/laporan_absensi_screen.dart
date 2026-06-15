@@ -138,11 +138,11 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Bulan Laporan', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+                      Text('Bulan Laporan', style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF6B7280))),
                       const SizedBox(height: 4),
                       Text(
                         '${_selectedMonth.month} - ${_selectedMonth.year}',
-                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: const Color(0xFF1E2925)),
                       ),
                     ],
                   ),
@@ -150,11 +150,12 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
                 ElevatedButton.icon(
                   onPressed: _pickMonth,
                   icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                  label: Text('Pilih', style: GoogleFonts.poppins()),
+                  label: Text('Pilih', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.inputBackground,
+                    backgroundColor: const Color(0xFFE8F2EF),
                     foregroundColor: AppColors.primaryDark,
                     elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ],

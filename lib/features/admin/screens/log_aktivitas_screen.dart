@@ -112,7 +112,7 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        color: AppColors.textPrimary,
+                        color: const Color(0xFF1E2925),
                       ),
                     ),
                     subtitle: Padding(
@@ -121,7 +121,7 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
                         isAuth ? 'Ust. Hasanuddin berhasil login' : (isData ? 'Menambahkan Ahmad Fauzi (IX A)' : 'Pesan: Pengumuman libur semester'),
                         style: GoogleFonts.poppins(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: const Color(0xFF6B7280),
                         ),
                       ),
                     ),

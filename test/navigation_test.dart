@@ -4,8 +4,6 @@ import 'package:santriku_app/main.dart';
 import 'package:santriku_app/features/auth/screens/login_screen.dart';
 import 'package:santriku_app/features/pengurus/screens/pengurus_dashboard_screen.dart';
 import 'package:santriku_app/features/pengurus/screens/daftar_santri_screen.dart';
-import 'package:santriku_app/features/wali/screens/wali_dashboard_screen.dart';
-import 'package:santriku_app/features/admin/screens/admin_dashboard_screen.dart';
 
 void main() {
   testWidgets('End-to-End Navigation Test for Pengurus Role', (WidgetTester tester) async {
@@ -15,13 +13,6 @@ void main() {
     // 1. Verifikasi berada di halaman Login
     expect(find.byType(LoginScreen), findsOneWidget);
 
-    // 2. Isi textfield agar validasi lolos
-    final emailField = find.descendant(
-      of: find.byType(TextFormField),
-      matching: find.textContaining('Email'),
-      skipOffstage: false,
-    ).first;
-    
     // As in standard Flutter test, we can just find by type and index since the UI has labels
     final textFields = find.byType(TextFormField);
     await tester.enterText(textFields.at(0), 'pengurus@santriku.com');
