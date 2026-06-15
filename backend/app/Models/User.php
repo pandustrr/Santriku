@@ -18,6 +18,11 @@ class User extends Authenticatable
         return $this->hasMany(DeviceToken::class);
     }
 
+    public function santris()
+    {
+        return $this->hasMany(Santri::class, 'wali_id');
+    }
+
     /**
      * The attributes that are mass assignable.
      *

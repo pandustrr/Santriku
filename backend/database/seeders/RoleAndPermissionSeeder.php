@@ -8,6 +8,7 @@ use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use App\Models\Santri;
 use Illuminate\Support\Facades\Hash;
 
 class RoleAndPermissionSeeder extends Seeder
@@ -81,5 +82,46 @@ class RoleAndPermissionSeeder extends Seeder
             'password' => Hash::make('123456'),
         ]);
         $wali->assignRole($waliRole);
+
+        // Seed Santri (Students)
+        Santri::create([
+            'name' => 'Ahmad Fauzi',
+            'nis' => '10101',
+            'kelas' => 'IX A',
+            'wali_id' => $wali->id,
+            'qr_token' => 'santri_ahmad_fauzi_10101',
+        ]);
+
+        Santri::create([
+            'name' => 'Muhammad Fatih',
+            'nis' => '10102',
+            'kelas' => 'IX A',
+            'wali_id' => $wali->id,
+            'qr_token' => 'santri_muhammad_fatih_10102',
+        ]);
+
+        Santri::create([
+            'name' => 'Aisyah',
+            'nis' => '10103',
+            'kelas' => 'VII B',
+            'wali_id' => null,
+            'qr_token' => 'santri_aisyah_10103',
+        ]);
+
+        Santri::create([
+            'name' => 'Budi Santoso',
+            'nis' => '10104',
+            'kelas' => 'VIII C',
+            'wali_id' => null,
+            'qr_token' => 'santri_budi_santoso_10104',
+        ]);
+
+        Santri::create([
+            'name' => 'Siti Aminah',
+            'nis' => '10105',
+            'kelas' => 'VII A',
+            'wali_id' => null,
+            'qr_token' => 'santri_siti_aminah_10105',
+        ]);
     }
 }
