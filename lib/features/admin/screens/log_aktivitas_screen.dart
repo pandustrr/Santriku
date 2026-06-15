@@ -21,10 +21,11 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primaryDark,
-              onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.accent,
+              onPrimary: AppColors.primaryDarker,
+              surface: AppColors.primaryDark,
+              onSurface: Colors.white,
             ),
           ),
           child: child!,

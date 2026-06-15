@@ -31,6 +31,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::post('santri', [AdminController::class, 'storeSantri']);
     Route::put('santri/{id}', [AdminController::class, 'updateSantri']);
     Route::delete('santri/{id}', [AdminController::class, 'destroySantri']);
+    Route::get('attendance-report', [AdminController::class, 'getAttendanceReport']);
 });
 
 use App\Http\Controllers\PengurusController;

@@ -225,4 +225,62 @@ class AdminController extends Controller
             'message' => 'Santri berhasil dihapus'
         ]);
     }
+
+    /**
+     * Get monthly attendance report for all students.
+     */
+    public function getAttendanceReport(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $month = $request->query('month', date('m'));
+        $year = $request->query('year', date('Y'));
+
+        $santris = Santri::all();
+        $report = [];
+
+        foreach ($santris as $santri) {
+            // Count Hadir
+            $hadir = \App\Models\Absensi::where('santri_id', $santri->id)
+                ->whereMonth('waktu_absen', $month)
+                ->whereYear('waktu_absen', $year)
+                ->where('status', 'Hadir')
+                ->count();
+
+            // Count Sakit (Approved Sick Leaves)
+            $sakit = \App\Models\Perizinan::where('santri_id', $santri->id)
+                ->where('status', 'Approved')
+                ->where('jenis_izin', 'Sakit')
+                ->where(function ($q) use ($month, $year) {
+                    $q->whereMonth('tanggal_mulai', $month)->whereYear('tanggal_mulai', $year)
+                      ->orWhereMonth('tanggal_selesai', $month)->whereYear('tanggal_selesai', $year);
+                })
+                ->count();
+
+            // Count Izin (Approved Other Leaves)
+            $izin = \App\Models\Perizinan::where('santri_id', $santri->id)
+                ->where('status', 'Approved')
+                ->whereIn('jenis_izin', ['Pulang', 'Lainnya'])
+                ->where(function ($q) use ($month, $year) {
+                    $q->whereMonth('tanggal_mulai', $month)->whereYear('tanggal_mulai', $year)
+                      ->orWhereMonth('tanggal_selesai', $month)->whereYear('tanggal_selesai', $year);
+                })
+                ->count();
+
+            // Alpha calculation: assume 25 active days max.
+            // Alpha = max(0, 25 - hadir - sakit - izin)
+            $activeDays = 25;
+            $alpha = max(0, $activeDays - $hadir - $sakit - $izin);
+
+            $report[] = [
+                'nama' => $santri->name,
+                'hadir' => $hadir,
+                'sakit' => $sakit,
+                'izin' => $izin,
+                'alpha' => $alpha,
+            ];
+        }
+
+        return response()->json($report);
+    }
 }

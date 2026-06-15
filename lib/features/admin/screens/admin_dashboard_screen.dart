@@ -165,15 +165,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       mainAxisSpacing: 16,
       childAspectRatio: 1.3,
       children: [
-        _buildSummaryCard('Total Santri', _isLoading ? '...' : '$_totalSantri', Icons.school_outlined),
-        _buildSummaryCard('Pengurus', _isLoading ? '...' : '$_totalPengurus', Icons.people_alt_outlined),
-        _buildSummaryCard('Wali Santri', _isLoading ? '...' : '$_totalWali', Icons.favorite_outline),
-        _buildSummaryCard('Kehadiran Hari Ini', _isLoading ? '...' : '${_attendanceRate.toStringAsFixed(0)}%', Icons.trending_up_rounded),
+        _buildSummaryCard(
+          'Total Santri',
+          _isLoading ? '...' : '$_totalSantri',
+          Icons.school_outlined,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const KelolaPenggunaScreen(initialFilter: 'Santri'),
+            ),
+          ).then((_) => _loadStats()),
+        ),
+        _buildSummaryCard(
+          'Pengurus',
+          _isLoading ? '...' : '$_totalPengurus',
+          Icons.people_alt_outlined,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const KelolaPenggunaScreen(initialFilter: 'Pengurus'),
+            ),
+          ).then((_) => _loadStats()),
+        ),
+        _buildSummaryCard(
+          'Wali Santri',
+          _isLoading ? '...' : '$_totalWali',
+          Icons.favorite_outline,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const KelolaPenggunaScreen(initialFilter: 'Wali'),
+            ),
+          ).then((_) => _loadStats()),
+        ),
+        _buildSummaryCard(
+          'Kehadiran Hari Ini',
+          _isLoading ? '...' : '${_attendanceRate.toStringAsFixed(0)}%',
+          Icons.trending_up_rounded,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LaporanAbsensiScreen(),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, IconData icon) {
+  Widget _buildSummaryCard(String title, String value, IconData icon, {VoidCallback? onTap}) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
@@ -184,7 +224,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {},
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

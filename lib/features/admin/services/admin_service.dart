@@ -241,4 +241,22 @@ class AdminService {
       };
     }
   }
+
+  /// Get monthly attendance report for all students
+  static Future<List<Map<String, dynamic>>> getAttendanceReport(int month, int year) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/admin/attendance-report?month=$month&year=$year'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(response.body);
+        return list.map((item) => Map<String, dynamic>.from(item)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
 }
