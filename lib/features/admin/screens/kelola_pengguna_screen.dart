@@ -190,7 +190,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                       label: Text(filter, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
                       selectedColor: AppColors.primaryLight,
                       checkmarkColor: AppColors.primaryDark,
-                      labelStyle: TextStyle(color: isSelected ? AppColors.primaryDark : AppColors.textSecondary),
+                      labelStyle: TextStyle(color: isSelected ? AppColors.primaryDark : Colors.grey[600]),
                       onSelected: (val) {
                         setState(() => _selectedFilter = filter);
                       },
@@ -233,7 +233,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                     ),
                     title: Text(
                       user['name']!,
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.textDark),
                     ),
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 4.0),
@@ -242,12 +242,12 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.inputBackground,
+                              color: const Color(0xFFF5F7F6),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               user['role']!,
-                              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[700]),
                             ),
                           ),
                           const SizedBox(width: 8),
