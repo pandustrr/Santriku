@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/pengurus/screens/scan_qr_screen.dart';
+import 'package:santriku_app/features/pengurus/screens/daftar_izin_screen.dart';
+import 'package:santriku_app/features/pengurus/screens/detail_izin_screen.dart';
+import 'package:santriku_app/features/pengurus/screens/daftar_santri_screen.dart';
+import 'package:santriku_app/features/pengurus/screens/stok_konsumsi_screen.dart';
+import 'package:santriku_app/features/pengurus/screens/notifikasi_screen.dart';
+import 'package:santriku_app/features/auth/screens/login_screen.dart';
 
 /// Halaman Dashboard utama untuk role Pengurus.
 ///
@@ -78,6 +84,23 @@ class PengurusDashboardScreen extends StatelessWidget {
                 ],
               ),
               const Spacer(),
+              // Logout button
+              GestureDetector(
+                onTap: () => _showLogoutDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.logout_rounded,
+                    color: AppColors.accent,
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               // Bell Notification Icon with Gold Badge
               _buildBellNotification(context),
             ],
@@ -140,7 +163,7 @@ class PengurusDashboardScreen extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         GestureDetector(
-          onTap: () => Navigator.of(context).pop(), // Simulasikan logout / pop
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotifikasiScreen())),
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -218,7 +241,7 @@ class PengurusDashboardScreen extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Card Item: Bilal Hasan
-          _buildIzinItemCard(),
+          _buildIzinItemCard(context),
         ],
       ),
     );
@@ -421,6 +444,7 @@ class PengurusDashboardScreen extends StatelessWidget {
           iconColor: const Color(0xFFE8A838),
           bgColor: const Color(0xFFFFF7EA),
           badge: '12',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DaftarIzinScreen())),
         ),
         const SizedBox(width: 14),
         _buildMenuButton(
@@ -428,6 +452,7 @@ class PengurusDashboardScreen extends StatelessWidget {
           label: 'Santri',
           iconColor: const Color(0xFF2B88D9),
           bgColor: const Color(0xFFEEF6FC),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DaftarSantriScreen())),
         ),
         const SizedBox(width: 14),
         _buildMenuButton(
@@ -435,6 +460,7 @@ class PengurusDashboardScreen extends StatelessWidget {
           label: 'Stok',
           iconColor: const Color(0xFF2A8B72),
           bgColor: const Color(0xFFE8F2EF),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StokKonsumsiScreen())),
         ),
       ],
     );
@@ -446,13 +472,13 @@ class PengurusDashboardScreen extends StatelessWidget {
     required Color iconColor,
     required Color bgColor,
     String? badge,
+    VoidCallback? onTap,
   }) {
     return Expanded(
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 18),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -464,28 +490,38 @@ class PengurusDashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      shape: BoxShape.circle,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, color: iconColor, size: 22),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          label,
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFF1E2925),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Icon(icon, color: iconColor, size: 22),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      color: const Color(0xFF1E2925),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -515,7 +551,7 @@ class PengurusDashboardScreen extends StatelessWidget {
   }
 
   // Pending Izin Item Card Builder
-  Widget _buildIzinItemCard() {
+  Widget _buildIzinItemCard(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -572,7 +608,12 @@ class PengurusDashboardScreen extends StatelessWidget {
           ),
           // Green Pill Tinjau Button
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DetailIzinScreen()),
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF104A3E),
               foregroundColor: Colors.white,
@@ -590,6 +631,41 @@ class PengurusDashboardScreen extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Logout Dialog ──────────────────────────────────────
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: Text(
+          'Apakah Anda yakin ingin keluar dari akun ini?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Logout', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

@@ -18,6 +18,10 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
   final _tglSelesaiController = TextEditingController();
   bool _isLoading = false;
 
+  String? _selectedSantri;
+  final List<String> _santriList = ['Muhammad Fatih (IX A)', 'Aisyah (VII B)'];
+  bool _isFileUploaded = false;
+
   @override
   void dispose() {
     _alasanController.dispose();
@@ -28,6 +32,12 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
 
   void _submitIzin() {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedSantri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih santri terlebih dahulu!'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -48,6 +58,35 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
 
       Navigator.of(context).pop();
     });
+  }
+
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(DateTime.now().year + 1),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryDark,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(foregroundColor: AppColors.primaryDark),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        controller.text = "${picked.day.toString().padLeft(2, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.year}";
+      });
+    }
   }
 
   @override
@@ -90,6 +129,43 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
                   ),
                   const SizedBox(height: 28),
 
+                  // Pilih Santri
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedSantri,
+                    decoration: InputDecoration(
+                      labelText: 'PILIH SANTRI',
+                      labelStyle: GoogleFonts.poppins(
+                        color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.inputBackground,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.inputBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.inputBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                      ),
+                    ),
+                    items: _santriList.map((santri) {
+                      return DropdownMenuItem(
+                        value: santri,
+                        child: Text(santri, style: GoogleFonts.poppins(fontSize: 14)),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedSantri = val),
+                  ),
+                  const SizedBox(height: 16),
+
                   // Alasan Izin
                   CustomTextField(
                     label: 'ALASAN PERIZINAN',
@@ -107,6 +183,8 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
                     label: 'TANGGAL MULAI',
                     hintText: 'DD-MM-YYYY',
                     controller: _tglMulaiController,
+                    readOnly: true,
+                    onTap: () => _selectDate(context, _tglMulaiController),
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Tanggal mulai harus diisi';
                       return null;
@@ -119,6 +197,8 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
                     label: 'TANGGAL SELESAI',
                     hintText: 'DD-MM-YYYY',
                     controller: _tglSelesaiController,
+                    readOnly: true,
+                    onTap: () => _selectDate(context, _tglSelesaiController),
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Tanggal selesai harus diisi';
                       return null;
@@ -171,35 +251,56 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
   }
 
   Widget _buildUploadSection() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.inputBackground,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() { _isFileUploaded = !_isFileUploaded; });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isFileUploaded ? 'File berhasil dipilih (Simulasi)' : 'File dibatalkan (Simulasi)'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.inputBorder, style: BorderStyle.solid),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        children: [
-          const Icon(Icons.cloud_upload_outlined, color: AppColors.accent, size: 36),
-          const SizedBox(height: 12),
-          Text(
-            'Upload Bukti Pendukung (Opsional)',
-            style: GoogleFonts.poppins(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: _isFileUploaded ? const Color(0xFFE8F2EF) : AppColors.inputBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _isFileUploaded ? const Color(0xFF2A8B72) : AppColors.inputBorder, style: BorderStyle.solid),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Format PDF, JPG, atau PNG maks 2MB',
-            style: GoogleFonts.poppins(
-              color: AppColors.textHint,
-              fontSize: 11,
-            ),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            children: [
+              Icon(
+                _isFileUploaded ? Icons.check_circle_rounded : Icons.cloud_upload_outlined,
+                color: _isFileUploaded ? const Color(0xFF2A8B72) : AppColors.accent,
+                size: 36,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _isFileUploaded ? 'File Bukti_Dokter.pdf (1.2MB)' : 'Upload Bukti Pendukung (Opsional)',
+                style: GoogleFonts.poppins(
+                  color: _isFileUploaded ? const Color(0xFF1E2925) : AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              if (!_isFileUploaded) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Format PDF, JPG, atau PNG maks 2MB',
+                  style: GoogleFonts.poppins(
+                    color: AppColors.textHint,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

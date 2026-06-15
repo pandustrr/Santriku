@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
+import 'package:santriku_app/features/admin/screens/kelola_pengguna_screen.dart';
+import 'package:santriku_app/features/admin/screens/laporan_absensi_screen.dart';
+import 'package:santriku_app/features/admin/screens/log_aktivitas_screen.dart';
+import 'package:santriku_app/features/auth/screens/login_screen.dart';
 
 /// Halaman Dashboard utama untuk role Admin.
 class AdminDashboardScreen extends StatelessWidget {
@@ -16,7 +20,7 @@ class AdminDashboardScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.accent),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => _showLogoutDialog(context),
           ),
         ],
       ),
@@ -38,7 +42,7 @@ class AdminDashboardScreen extends StatelessWidget {
                 const SizedBox(height: 28),
                 _buildSectionTitle('Manajemen Data'),
                 const SizedBox(height: 16),
-                _buildManagementList(),
+                _buildManagementList(context),
               ],
             ),
           ),
@@ -94,40 +98,49 @@ class AdminDashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.inputBorder),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: AppColors.accent, size: 24),
-              const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textHint, size: 12),
-            ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {},
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Icon(icon, color: AppColors.accent, size: 24),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textHint, size: 12),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: GoogleFonts.poppins(
+                        color: AppColors.textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                )
+              ],
+            ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  color: AppColors.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          )
-        ],
+        ),
       ),
     );
   }
@@ -143,51 +156,107 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildManagementList() {
+  Widget _buildManagementList(BuildContext context) {
     return Column(
       children: [
-        _buildMenuItem('Kelola Pengguna', 'Tambah & edit akun santri, wali, & pengurus', Icons.manage_accounts_outlined),
+        _buildMenuItem(
+          'Kelola Pengguna', 
+          'Tambah & edit akun santri, wali, & pengurus', 
+          Icons.manage_accounts_outlined,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KelolaPenggunaScreen())),
+        ),
         const SizedBox(height: 12),
-        _buildMenuItem('Laporan Absensi', 'Rekapitulasi kehadiran santri per bulan', Icons.analytics_outlined),
+        _buildMenuItem(
+          'Laporan Absensi', 
+          'Rekapitulasi kehadiran santri per bulan', 
+          Icons.analytics_outlined,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LaporanAbsensiScreen())),
+        ),
         const SizedBox(height: 12),
-        _buildMenuItem('Log Aktivitas', 'Riwayat perubahan data & transaksi sistem', Icons.history_toggle_off_rounded),
+        _buildMenuItem(
+          'Log Aktivitas', 
+          'Riwayat perubahan data & transaksi sistem', 
+          Icons.history_toggle_off_rounded,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogAktivitasScreen())),
+        ),
       ],
     );
   }
 
-  Widget _buildMenuItem(String title, String subtitle, IconData icon) {
+  Widget _buildMenuItem(String title, String subtitle, IconData icon, VoidCallback onTap) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.inputBorder),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.primaryDark,
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primaryDark,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppColors.accent),
+            ),
+            title: Text(
+              title,
+              style: GoogleFonts.poppins(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: GoogleFonts.poppins(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
           ),
-          child: Icon(icon, color: AppColors.accent),
         ),
-        title: Text(
-          title,
-          style: GoogleFonts.poppins(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  // ── Logout Dialog ──────────────────────────────────────
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: Text(
+          'Apakah Anda yakin ingin keluar dari akun ini?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
           ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: GoogleFonts.poppins(
-            color: AppColors.textSecondary,
-            fontSize: 12,
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Logout', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
           ),
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-        onTap: () {},
+        ],
       ),
     );
   }

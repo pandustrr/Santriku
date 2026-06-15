@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/wali/screens/pengajuan_izin_screen.dart';
+import 'package:santriku_app/features/wali/screens/riwayat_aktivitas_screen.dart';
+import 'package:santriku_app/features/wali/screens/detail_santri_screen.dart';
+import 'package:santriku_app/features/wali/screens/riwayat_izin_wali_screen.dart';
+import 'package:santriku_app/features/auth/screens/login_screen.dart';
 
 /// Halaman Dashboard utama untuk role Wali Santri.
 class WaliDashboardScreen extends StatelessWidget {
@@ -17,7 +21,7 @@ class WaliDashboardScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.accent),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => _showLogoutDialog(context),
           ),
         ],
       ),
@@ -35,17 +39,17 @@ class WaliDashboardScreen extends StatelessWidget {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 24),
-                _buildSantriProfileCard(),
+                _buildSantriProfileCard(context),
                 const SizedBox(height: 28),
                 _buildSectionTitle('Status Hari Ini'),
                 const SizedBox(height: 16),
-                _buildStatusGrid(),
+                _buildStatusGrid(context),
                 const SizedBox(height: 28),
                 _buildQuickActions(context),
                 const SizedBox(height: 32),
                 _buildSectionTitle('Aktivitas Santri'),
                 const SizedBox(height: 16),
-                _buildSantriActivities(),
+                _buildSantriActivities(context),
               ],
             ),
           ),
@@ -77,15 +81,23 @@ class WaliDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSantriProfileCard() {
+  Widget _buildSantriProfileCard(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.inputBorder),
       ),
-      padding: const EdgeInsets.all(20),
-      child: Row(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DetailSantriScreen())),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
         children: [
           const CircleAvatar(
             radius: 28,
@@ -117,10 +129,13 @@ class WaliDashboardScreen extends StatelessWidget {
           ),
         ],
       ),
+            ),
+          ),
+        ),
     );
   }
 
-  Widget _buildStatusGrid() {
+  Widget _buildStatusGrid(BuildContext context) {
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
@@ -128,22 +143,30 @@ class WaliDashboardScreen extends StatelessWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 0.9,
       children: [
-        _buildStatusItem('Absensi', 'Hadir', Icons.check_circle_rounded, AppColors.success),
-        _buildStatusItem('Makan Pagi', 'Sukses', Icons.restaurant_rounded, AppColors.accent),
-        _buildStatusItem('Perizinan', 'Tidak Izin', Icons.verified_user_rounded, AppColors.info),
+        _buildStatusItem(context, 'Absensi', 'Hadir', Icons.check_circle_rounded, AppColors.success),
+        _buildStatusItem(context, 'Makan Pagi', 'Sukses', Icons.restaurant_rounded, AppColors.accent),
+        _buildStatusItem(context, 'Perizinan', 'Tidak Izin', Icons.verified_user_rounded, AppColors.info),
       ],
     );
   }
 
-  Widget _buildStatusItem(String title, String value, IconData icon, Color color) {
+  Widget _buildStatusItem(BuildContext context, String title, String value, IconData icon, Color color) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.inputBorder),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Detail $title belum tersedia')));
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 28),
@@ -167,26 +190,54 @@ class WaliDashboardScreen extends StatelessWidget {
           ),
         ],
       ),
+            ),
+          ),
+        ),
     );
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton.icon(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const PengajuanIzinScreen(),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const PengajuanIzinScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.add_moderator_rounded, size: 22),
+            label: const Text('Ajukan Izin Santri'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.primaryDarker,
+            ),
           ),
         ),
-        icon: const Icon(Icons.add_moderator_rounded, size: 22),
-        label: const Text('Ajukan Izin Santri'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.primaryDarker,
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const RiwayatIzinWaliScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.history_rounded, size: 22),
+            label: const Text('Riwayat & Status Izin'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.accent,
+              side: const BorderSide(color: AppColors.accent, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -201,27 +252,32 @@ class WaliDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSantriActivities() {
+  Widget _buildSantriActivities(BuildContext context) {
     return Column(
       children: [
-        _buildActivityRow('Sarapan Pagi', 'Scan konsumsi terverifikasi', '06:45 WIB', Icons.breakfast_dining_rounded),
+        _buildActivityRow(context, 'Sarapan Pagi', 'Scan konsumsi terverifikasi', '06:45 WIB', Icons.breakfast_dining_rounded),
         const SizedBox(height: 12),
-        _buildActivityRow('Absensi Subuh', 'Hadir di masjid utama', '05:15 WIB', Icons.check_circle_outline),
+        _buildActivityRow(context, 'Absensi Subuh', 'Hadir di masjid utama', '05:15 WIB', Icons.check_circle_outline),
         const SizedBox(height: 12),
-        _buildActivityRow('Makan Malam Kemarin', 'Selesai makan malam', '18:22 WIB', Icons.dinner_dining_rounded),
+        _buildActivityRow(context, 'Makan Malam Kemarin', 'Selesai makan malam', '18:22 WIB', Icons.dinner_dining_rounded),
       ],
     );
   }
 
-  Widget _buildActivityRow(String title, String subtitle, String time, IconData icon) {
+  Widget _buildActivityRow(BuildContext context, String title, String subtitle, String time, IconData icon) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.inputBorder),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiwayatAktivitasScreen())),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -252,6 +308,43 @@ class WaliDashboardScreen extends StatelessWidget {
             fontSize: 11,
           ),
         ),
+      ),
+        ),
+      ),
+    );
+  }
+
+  // ── Logout Dialog ──────────────────────────────────────
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: Text(
+          'Apakah Anda yakin ingin keluar dari akun ini?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Logout', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
