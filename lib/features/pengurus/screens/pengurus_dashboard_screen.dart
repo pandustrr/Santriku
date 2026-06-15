@@ -5,7 +5,6 @@ import 'package:santriku_app/features/pengurus/screens/scan_qr_screen.dart';
 import 'package:santriku_app/features/pengurus/screens/daftar_izin_screen.dart';
 import 'package:santriku_app/features/pengurus/screens/daftar_santri_screen.dart';
 import 'package:santriku_app/features/pengurus/screens/stok_konsumsi_screen.dart';
-import 'package:santriku_app/features/pengurus/screens/notifikasi_screen.dart';
 import 'package:santriku_app/features/auth/screens/login_screen.dart';
 import 'package:santriku_app/features/auth/services/auth_service.dart';
 import 'package:santriku_app/features/pengurus/services/pengurus_service.dart';
@@ -195,9 +194,6 @@ class _PengurusDashboardScreenState extends State<PengurusDashboardScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // Bell Notification Icon with Gold Badge
-              _buildBellNotification(context),
             ],
           ),
 
@@ -252,41 +248,6 @@ class _PengurusDashboardScreenState extends State<PengurusDashboardScreen> {
     );
   }
 
-  // Helper Bell Notification
-  Widget _buildBellNotification(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotifikasiScreen())),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.notifications_none_rounded,
-              color: AppColors.textPrimary,
-              size: 22,
-            ),
-          ),
-        ),
-        Positioned(
-          top: 2,
-          right: 2,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   // ── White/Off-White Body Section ───────────────────────
   Widget _buildWhiteBody(BuildContext context) {

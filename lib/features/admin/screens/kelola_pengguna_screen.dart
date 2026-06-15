@@ -596,7 +596,11 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                                   ),
                                 ),
                                 trailing: PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert_rounded),
+                                  icon: const Icon(
+                                    Icons.more_vert_rounded,
+                                    color: AppColors.primaryDark,
+                                    size: 24,
+                                  ),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   onSelected: (val) {
                                     if (val == 'edit') {

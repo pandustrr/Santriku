@@ -330,6 +330,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         const SizedBox(height: 12),
         _buildMenuItem(
+          'Laporan Konsumsi', 
+          'Rekapitulasi konsumsi makanan santri per bulan', 
+          Icons.restaurant_menu_outlined,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LaporanKonsumsiScreen())),
+        ),
+        const SizedBox(height: 12),
+        _buildMenuItem(
+          'Generate QR Code', 
+          'Buat QR absensi & konsumsi untuk santri', 
+          Icons.qr_code_rounded,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GenerateQrScreen())),
+        ),
+        const SizedBox(height: 12),
+        _buildMenuItem(
+          'Pengaturan Lokasi & GPS', 
+          'Atur koordinat pusat geofence kehadiran pesantren', 
+          Icons.map_outlined,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PengaturanGpsScreen())),
+        ),
+        const SizedBox(height: 12),
+        _buildMenuItem(
           'Log Aktivitas', 
           'Riwayat perubahan data & transaksi sistem', 
           Icons.history_toggle_off_rounded,

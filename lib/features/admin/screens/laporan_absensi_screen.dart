@@ -1,10 +1,14 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
 import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:santriku_app/features/admin/services/admin_service.dart';
+import 'package:universal_html/html.dart' as html;
+import 'package:open_file_plus/open_file_plus.dart';
+import 'dart:convert' show base64Encode;
 
 class LaporanAbsensiScreen extends StatefulWidget {
   const LaporanAbsensiScreen({super.key});
@@ -104,35 +108,87 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
       for (var row in _rekapData) {
         sheetObject.appendRow([
           TextCellValue(row['nama'].toString()),
-          IntCellValue(row['hadir']),
-          IntCellValue(row['sakit']),
-          IntCellValue(row['izin']),
-          IntCellValue(row['alpha']),
+          IntCellValue((row['hadir'] as num?)?.toInt() ?? 0),
+          IntCellValue((row['sakit'] as num?)?.toInt() ?? 0),
+          IntCellValue((row['izin'] as num?)?.toInt() ?? 0),
+          IntCellValue((row['alpha'] as num?)?.toInt() ?? 0),
         ]);
       }
 
-      Directory? directory;
-      if (Platform.isAndroid) {
-        directory = await getExternalStorageDirectory();
-      } else {
-        directory = await getApplicationDocumentsDirectory();
-      }
-
-      final String filePath =
-          '${directory?.path}/Rekap_Absensi_${_selectedMonth.month}_${_selectedMonth.year}.xlsx';
       final fileBytes = excel.save();
+      if (fileBytes == null) throw 'Gagal membuat file Excel';
 
-      if (fileBytes != null) {
-        File(filePath)
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(fileBytes);
+      final fileName = 'Rekap_Absensi_${_selectedMonth.month}_${_selectedMonth.year}.xlsx';
+
+      if (kIsWeb) {
+        final content = base64Encode(fileBytes);
+        html.AnchorElement(
+            href: "data:application/octet-stream;charset=utf-16le;base64,$content")
+          ..setAttribute("download", fileName)
+          ..click();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Berhasil diunduh!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        Directory? directory;
+        try {
+          if (defaultTargetPlatform == TargetPlatform.android) {
+            directory = await getExternalStorageDirectory();
+            if (directory != null) {
+              final parts = directory.path.split('/');
+              final idx = parts.indexOf('Android');
+              if (idx > 0) {
+                directory = Directory('${parts.sublist(0, idx).join('/')}/Download');
+                if (!await directory.exists()) {
+                  await directory.create(recursive: true);
+                }
+              }
+            }
+          }
+        } catch (_) {
+          directory = null;
+        }
+
+        directory ??= await getApplicationDocumentsDirectory();
+
+        final filePath = '${directory.path}/$fileName';
+        final file = File(filePath);
+        await file.create(recursive: true);
+        await file.writeAsBytes(fileBytes);
+
+        // Langsung buka
+        await OpenFile.open(filePath);
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Laporan berhasil diexport ke:\n$filePath'),
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Text(
+                    '✅ Berhasil diunduh! Ketuk untuk buka.',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    OpenFile.open(filePath);
+                  },
+                  child: const Text(
+                    'BUKA',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
