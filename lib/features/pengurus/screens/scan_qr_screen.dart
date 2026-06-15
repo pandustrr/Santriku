@@ -33,24 +33,24 @@ class _ScanQrScreenState extends State<ScanQrScreen>
   bool _isTorchOn = false;
   bool _isProcessing = false;
 
-  // ── State GPS ─────────────────────────────────────────────
+  // ── State GPS & Settings ──────────────────────────────────
   bool _isGpsLoading = true;
   Position? _currentPosition;
-  String _locationLabel = 'Mendapatkan lokasi GPS...';
+  String _locationLabel = 'Memuat pengaturan...';
   bool _geofenceOk = false;
   String? _gpsError;
 
-  // ── Koordinat pusat pesantren (ganti sesuai lokasi nyata) ─
-  static const double _pesantrenLat = -8.12345;
-  static const double _pesantrenLon = 113.12345;
-  static const double _geofenceRadius = 100.0; // meter
+  double? _pesantrenLat;
+  double? _pesantrenLon;
+  double _geofenceRadius = 100.0;
+  String _locationName = 'Pesantren';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (widget.isAbsensi) {
-      _initGps();
+      _loadSettingsThenGps();
     } else {
       setState(() {
         _isGpsLoading = false;
@@ -58,6 +58,30 @@ class _ScanQrScreenState extends State<ScanQrScreen>
         _geofenceOk = true;
       });
     }
+  }
+
+  /// Ambil settings lokasi dari API admin, lalu inisialisasi GPS.
+  Future<void> _loadSettingsThenGps() async {
+    if (mounted) {
+      setState(() {
+        _isGpsLoading = true;
+        _locationLabel = 'Memuat pengaturan lokasi...';
+      });
+    }
+
+    try {
+      final settings = await AdminService.getSettings();
+      if (settings.isNotEmpty) {
+        _pesantrenLat = (settings['latitude'] as num?)?.toDouble();
+        _pesantrenLon = (settings['longitude'] as num?)?.toDouble();
+        _geofenceRadius = (settings['radius'] as num?)?.toDouble() ?? 100.0;
+        _locationName = settings['name']?.toString() ?? 'Pesantren';
+      }
+    } catch (_) {
+      // Jika gagal ambil settings, tetap lanjut GPS dengan koordinat null
+    }
+
+    await _initGps();
   }
 
   @override
@@ -107,29 +131,39 @@ class _ScanQrScreenState extends State<ScanQrScreen>
         throw 'Izin GPS ditolak permanen.\nBuka Pengaturan > Aplikasi > Santriku > Izin Lokasi.';
       }
 
-      // 3. Dapatkan posisi
+      // 3. Dapatkan posisi perangkat saat ini
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 15),
       );
 
-      // 4. Hitung jarak ke pesantren
-      final distance = Geolocator.distanceBetween(
-        _pesantrenLat,
-        _pesantrenLon,
-        position.latitude,
-        position.longitude,
-      );
-      final isOk = distance <= _geofenceRadius;
+      // 4. Hitung jarak ke lokasi pesantren (koordinat dinamis dari API)
+      bool isOk = false;
+      String label;
+
+      if (_pesantrenLat != null && _pesantrenLon != null) {
+        final distance = Geolocator.distanceBetween(
+          _pesantrenLat!,
+          _pesantrenLon!,
+          position.latitude,
+          position.longitude,
+        );
+        isOk = distance <= _geofenceRadius;
+        label = isOk
+            ? '✓ Di dalam area $_locationName (${distance.toStringAsFixed(0)}m)'
+            : '✗ Di luar area $_locationName (${distance.toStringAsFixed(0)}m)';
+      } else {
+        // Koordinat belum tersedia dari server — tetap izinkan tapi beri info
+        isOk = true;
+        label = 'ℹ️ Lokasi: (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
+      }
 
       if (mounted) {
         setState(() {
           _currentPosition = position;
           _geofenceOk = isOk;
           _isGpsLoading = false;
-          _locationLabel = isOk
-              ? '✓ Di dalam area pesantren (${distance.toStringAsFixed(0)}m)'
-              : '✗ Di luar area pesantren (${distance.toStringAsFixed(0)}m)';
+          _locationLabel = label;
         });
       }
     } catch (e) {

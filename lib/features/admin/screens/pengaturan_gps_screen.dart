@@ -89,6 +89,7 @@ class _PengaturanGpsScreenState extends State<PengaturanGpsScreen> {
         _isLocating = false;
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✓ Lokasi saat ini berhasil disematkan!'),
@@ -97,6 +98,7 @@ class _PengaturanGpsScreenState extends State<PengaturanGpsScreen> {
       );
     } catch (e) {
       setState(() => _isLocating = false);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal mendapatkan lokasi: $e'),
