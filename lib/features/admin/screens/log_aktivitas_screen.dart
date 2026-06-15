@@ -21,11 +21,25 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppColors.accent,
               onPrimary: AppColors.primaryDarker,
               surface: AppColors.primaryDark,
               onSurface: Colors.white,
+              // Kontras tinggi untuk header hari & teks navigasi
+              secondaryContainer: AppColors.accent.withValues(alpha: 0.3),
+              onSecondaryContainer: Colors.white,
+              // Pastikan teks tanggal biasa terbaca jelas
+              onBackground: Colors.white,
+              surfaceVariant: AppColors.primaryDarker,
+              onSurfaceVariant: Colors.white,
+              outline: AppColors.accent.withValues(alpha: 0.5),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                textStyle: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
           child: child!,
@@ -38,6 +52,7 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/admin/admin.dart';
+import 'package:santriku_app/features/admin/screens/detail_kehadiran_screen.dart';
 import 'package:santriku_app/features/admin/screens/kelola_pengguna_screen.dart';
 import 'package:santriku_app/features/admin/screens/laporan_absensi_screen.dart';
 import 'package:santriku_app/features/admin/screens/log_aktivitas_screen.dart';
@@ -169,6 +170,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           'Total Santri',
           _isLoading ? '...' : '$_totalSantri',
           Icons.school_outlined,
+          const Color(0xFF1B5E20),
+          AppColors.success,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -177,9 +180,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ).then((_) => _loadStats()),
         ),
         _buildSummaryCard(
-          'Pengurus',
+          'Total Pengurus',
           _isLoading ? '...' : '$_totalPengurus',
           Icons.people_alt_outlined,
+          const Color(0xFF0D2F4F),
+          AppColors.info,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -188,9 +193,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ).then((_) => _loadStats()),
         ),
         _buildSummaryCard(
-          'Wali Santri',
+          'Total Wali Santri',
           _isLoading ? '...' : '$_totalWali',
           Icons.favorite_outline,
+          const Color(0xFF4E2E00),
+          AppColors.accent,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -202,10 +209,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           'Kehadiran Hari Ini',
           _isLoading ? '...' : '${_attendanceRate.toStringAsFixed(0)}%',
           Icons.trending_up_rounded,
+          const Color(0xFF4A0000),
+          AppColors.error,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => const LaporanAbsensiScreen(),
+              builder: (_) => const DetailKehadiranScreen(),
             ),
           ),
         ),
@@ -213,12 +222,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, IconData icon, {VoidCallback? onTap}) {
+  Widget _buildSummaryCard(
+    String title,
+    String value,
+    IconData icon,
+    Color bgColor,
+    Color accentColor, {
+    VoidCallback? onTap,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.inputBorder),
+        border: Border.all(color: accentColor.withValues(alpha: 0.35)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -234,8 +250,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(icon, color: AppColors.accent, size: 24),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textHint, size: 12),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(icon, color: accentColor, size: 20),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.inputBackground,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: AppColors.textHint,
+                        size: 10,
+                      ),
+                    ),
                   ],
                 ),
                 Column(
@@ -245,15 +279,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       value,
                       style: GoogleFonts.poppins(
                         color: AppColors.textPrimary,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
                       title,
                       style: GoogleFonts.poppins(
                         color: AppColors.textSecondary,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
