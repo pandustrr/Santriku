@@ -17,11 +17,11 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
   bool _isExporting = false;
 
   final List<Map<String, dynamic>> _rekapData = [
-    {'nama': 'Muhammad Fatih', 'kelas': 'IX A', 'hadir': 28, 'sakit': 1, 'izin': 1, 'alpha': 0},
-    {'nama': 'Aisyah', 'kelas': 'VII B', 'hadir': 30, 'sakit': 0, 'izin': 0, 'alpha': 0},
-    {'nama': 'Ahmad Fauzi', 'kelas': 'IX A', 'hadir': 25, 'sakit': 2, 'izin': 3, 'alpha': 0},
-    {'nama': 'Budi Santoso', 'kelas': 'VIII C', 'hadir': 20, 'sakit': 5, 'izin': 2, 'alpha': 3},
-    {'nama': 'Siti Aminah', 'kelas': 'VII A', 'hadir': 29, 'sakit': 1, 'izin': 0, 'alpha': 0},
+    {'nama': 'Muhammad Fatih', 'hadir': 28, 'sakit': 1, 'izin': 1, 'alpha': 0},
+    {'nama': 'Aisyah', 'hadir': 30, 'sakit': 0, 'izin': 0, 'alpha': 0},
+    {'nama': 'Ahmad Fauzi', 'hadir': 25, 'sakit': 2, 'izin': 3, 'alpha': 0},
+    {'nama': 'Budi Santoso', 'hadir': 20, 'sakit': 5, 'izin': 2, 'alpha': 3},
+    {'nama': 'Siti Aminah', 'hadir': 29, 'sakit': 1, 'izin': 0, 'alpha': 0},
   ];
 
   Future<void> _pickMonth() async {
@@ -61,7 +61,6 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
       // Tambahkan header
       sheetObject.appendRow([
         TextCellValue('Nama Santri'),
-        TextCellValue('Kelas'),
         TextCellValue('Hadir'),
         TextCellValue('Sakit'),
         TextCellValue('Izin'),
@@ -72,7 +71,6 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
       for (var row in _rekapData) {
         sheetObject.appendRow([
           TextCellValue(row['nama'].toString()),
-          TextCellValue(row['kelas'].toString()),
           IntCellValue(row['hadir']),
           IntCellValue(row['sakit']),
           IntCellValue(row['izin']),
@@ -171,7 +169,6 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
                   columnSpacing: 24,
                   columns: [
                     DataColumn(label: Text('Nama Santri', style: GoogleFonts.poppins(fontWeight: FontWeight.w600))),
-                    DataColumn(label: Text('Kelas', style: GoogleFonts.poppins(fontWeight: FontWeight.w600))),
                     DataColumn(label: Text('H', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.success))),
                     DataColumn(label: Text('S', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.accent))),
                     DataColumn(label: Text('I', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.info))),
@@ -181,7 +178,6 @@ class _LaporanAbsensiScreenState extends State<LaporanAbsensiScreen> {
                     return DataRow(
                       cells: [
                         DataCell(Text(data['nama'], style: GoogleFonts.poppins(fontWeight: FontWeight.w500))),
-                        DataCell(Text(data['kelas'], style: GoogleFonts.poppins(fontSize: 12))),
                         DataCell(Text(data['hadir'].toString(), style: GoogleFonts.poppins(fontWeight: FontWeight.w600))),
                         DataCell(Text(data['sakit'].toString(), style: GoogleFonts.poppins())),
                         DataCell(Text(data['izin'].toString(), style: GoogleFonts.poppins())),

@@ -126,7 +126,6 @@ class AdminTest extends TestCase
         ])->postJson('/api/admin/santri', [
             'name' => 'Santri Baru',
             'nis' => '10106',
-            'kelas' => 'VIII B',
             'wali_id' => null,
             'qr_token' => 'santri_baru_10106',
         ]);
@@ -141,7 +140,6 @@ class AdminTest extends TestCase
         ])->putJson("/api/admin/santri/{$newSantri->id}", [
             'name' => 'Santri Baru Diperbarui',
             'nis' => '10106',
-            'kelas' => 'VIII B',
             'wali_id' => null,
             'qr_token' => 'santri_baru_10106',
         ]);

@@ -5,13 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 class ProfilSantriScreen extends StatelessWidget {
   final String nama;
   final String nis;
-  final String kelas;
 
   const ProfilSantriScreen({
     super.key,
     required this.nama,
     required this.nis,
-    required this.kelas,
   });
 
   @override
@@ -92,11 +90,7 @@ class ProfilSantriScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildInfoRow('Kelas', kelas),
-          const Divider(height: 24),
-          _buildInfoRow('Kamar', 'Al-Khawarizmi'),
-          const Divider(height: 24),
-          _buildInfoRow('Wali Kelas', 'Ust. Ahmad Dahlan'),
+          _buildInfoRow('NIS', nis),
           const Divider(height: 24),
           _buildInfoRow('Tahun Masuk', '2023'),
           const Divider(height: 24),

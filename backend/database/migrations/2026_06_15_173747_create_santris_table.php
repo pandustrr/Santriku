@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('nis')->unique();
-            $table->string('kelas');
             $table->foreignId('wali_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('qr_token')->unique();
             $table->timestamps();

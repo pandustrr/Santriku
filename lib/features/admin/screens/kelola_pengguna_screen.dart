@@ -52,7 +52,6 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
         'id': s['id'],
         'name': s['name'] ?? '',
         'nis': s['nis'] ?? '',
-        'kelas': s['kelas'] ?? '',
         'wali_id': s['wali_id'],
         'qr_token': s['qr_token'] ?? '',
         'role': 'Santri',
@@ -83,7 +82,6 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
 
     // Santri specific
     final nisController = TextEditingController(text: (isEdit && isSantri) ? item['nis'] : '');
-    final kelasController = TextEditingController(text: (isEdit && isSantri) ? item['kelas'] : '');
     final qrController = TextEditingController(text: (isEdit && isSantri) ? item['qr_token'] : '');
     int? selectedWaliId = (isEdit && isSantri) ? item['wali_id'] : null;
 
@@ -169,20 +167,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Kelas
-                        TextField(
-                          controller: kelasController,
-                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
-                          decoration: InputDecoration(
-                            labelText: 'KELAS',
-                            hintText: 'Masukkan kelas (misal: VII A)',
-                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
-                            filled: true,
-                            fillColor: const Color(0xFFF5F7F6),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+
 
                         // Wali Dropdown
                         DropdownButtonFormField<int>(
@@ -290,12 +275,11 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
 
                     if (isRoleSantri) {
                       final nis = nisController.text.trim();
-                      final kelas = kelasController.text.trim();
                       final qrToken = qrController.text.trim();
 
-                      if (nis.isEmpty || kelas.isEmpty || qrToken.isEmpty) {
+                      if (nis.isEmpty || qrToken.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('NIS, Kelas, dan QR Token harus diisi!'), backgroundColor: AppColors.error),
+                          const SnackBar(content: Text('NIS dan QR Token harus diisi!'), backgroundColor: AppColors.error),
                         );
                         return;
                       }
@@ -303,7 +287,6 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                       final data = {
                         'name': name,
                         'nis': nis,
-                        'kelas': kelas,
                         'wali_id': selectedWaliId,
                         'qr_token': qrToken,
                       };
@@ -555,17 +538,8 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      if (isSantri) ...[
-                                        Text(
-                                          'Kelas: ${user['kelas']}',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            color: const Color(0xFF6B7280),
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ] else ...[
+                                      if (!isSantri) ...[
+                                        const SizedBox(width: 8),
                                         Text(
                                           user['status']!,
                                           style: GoogleFonts.poppins(
