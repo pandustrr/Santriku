@@ -87,7 +87,6 @@ class RoleAndPermissionSeeder extends Seeder
         Santri::create([
             'name' => 'Ahmad Fauzi',
             'nis' => '10101',
-            'kelas' => 'IX A',
             'wali_id' => $wali->id,
             'qr_token' => 'santri_ahmad_fauzi_10101',
         ]);
@@ -95,7 +94,6 @@ class RoleAndPermissionSeeder extends Seeder
         Santri::create([
             'name' => 'Muhammad Fatih',
             'nis' => '10102',
-            'kelas' => 'IX A',
             'wali_id' => $wali->id,
             'qr_token' => 'santri_muhammad_fatih_10102',
         ]);
@@ -103,7 +101,6 @@ class RoleAndPermissionSeeder extends Seeder
         Santri::create([
             'name' => 'Aisyah',
             'nis' => '10103',
-            'kelas' => 'VII B',
             'wali_id' => null,
             'qr_token' => 'santri_aisyah_10103',
         ]);
@@ -111,7 +108,6 @@ class RoleAndPermissionSeeder extends Seeder
         Santri::create([
             'name' => 'Budi Santoso',
             'nis' => '10104',
-            'kelas' => 'VIII C',
             'wali_id' => null,
             'qr_token' => 'santri_budi_santoso_10104',
         ]);
@@ -119,7 +115,6 @@ class RoleAndPermissionSeeder extends Seeder
         Santri::create([
             'name' => 'Siti Aminah',
             'nis' => '10105',
-            'kelas' => 'VII A',
             'wali_id' => null,
             'qr_token' => 'santri_siti_aminah_10105',
         ]);

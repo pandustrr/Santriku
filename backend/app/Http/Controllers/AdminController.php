@@ -175,7 +175,6 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'nis' => 'required|string|max:255|unique:santris',
-            'kelas' => 'required|string|max:255',
             'wali_id' => 'nullable|exists:users,id',
             'qr_token' => 'required|string|max:255|unique:santris',
         ]);
@@ -200,7 +199,6 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'nis' => 'required|string|max:255|unique:santris,nis,' . $santri->id,
-            'kelas' => 'required|string|max:255',
             'wali_id' => 'nullable|exists:users,id',
             'qr_token' => 'required|string|max:255|unique:santris,qr_token,' . $santri->id,
         ]);
