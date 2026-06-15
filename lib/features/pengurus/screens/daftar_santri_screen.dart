@@ -18,7 +18,6 @@ class _DaftarSantriScreenState extends State<DaftarSantriScreen> {
     (index) => {
       'nama': 'Santri ${index + 1}',
       'nis': '1010${index + 1}',
-      'kelas': '${index % 3 + 10}A',
     },
   );
 
@@ -144,7 +143,7 @@ class _DaftarSantriScreenState extends State<DaftarSantriScreen> {
                             ),
                           ),
                           subtitle: Text(
-                            'NIS: ${santri['nis']} • Kelas ${santri['kelas']}',
+                            'NIS: ${santri['nis']}',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -158,7 +157,6 @@ class _DaftarSantriScreenState extends State<DaftarSantriScreen> {
                                 builder: (_) => ProfilSantriScreen(
                                   nama: santri['nama']!,
                                   nis: santri['nis']!,
-                                  kelas: santri['kelas']!,
                                 ),
                               ),
                             );

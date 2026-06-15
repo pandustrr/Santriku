@@ -1,17 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
+import 'package:santriku_app/features/admin/admin.dart';
 import 'package:santriku_app/features/admin/screens/kelola_pengguna_screen.dart';
 import 'package:santriku_app/features/admin/screens/laporan_absensi_screen.dart';
 import 'package:santriku_app/features/admin/screens/log_aktivitas_screen.dart';
 import 'package:santriku_app/features/auth/screens/login_screen.dart';
+import 'package:santriku_app/features/auth/services/auth_service.dart';
 
 /// Halaman Dashboard utama untuk role Admin.
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  bool _isLoading = true;
+  int _totalSantri = 0;
+  int _totalPengurus = 0;
+  int _totalWali = 0;
+  double _attendanceRate = 0.0;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    final response = await AdminService.getDashboardStats();
+
+    if (mounted) {
+      if (response['success']) {
+        final data = response['data'];
+        setState(() {
+          _totalSantri = data['total_santri'] ?? 0;
+          _totalPengurus = data['total_pengurus'] ?? 0;
+          _totalWali = data['total_wali'] ?? 0;
+          _attendanceRate = (data['attendance_rate'] as num?)?.toDouble() ?? 0.0;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = response['message'] ?? 'Gagal memuat data statistik';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final adminName = AuthService.currentUser?['name'] ?? 'Administrator';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard Admin'),
@@ -31,19 +80,52 @@ class AdminDashboardScreen extends StatelessWidget {
           gradient: AppColors.backgroundGradient,
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 28),
-                _buildSummaryGrid(),
-                const SizedBox(height: 28),
-                _buildSectionTitle('Manajemen Data'),
-                const SizedBox(height: 16),
-                _buildManagementList(context),
-              ],
+          child: RefreshIndicator(
+            onRefresh: _loadStats,
+            color: AppColors.accent,
+            backgroundColor: AppColors.primaryDark,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(adminName),
+                  const SizedBox(height: 28),
+                  if (_errorMessage.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.error),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: AppColors.error),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _errorMessage,
+                              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh, color: Colors.white),
+                            onPressed: _loadStats,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildSummaryGrid(),
+                  const SizedBox(height: 28),
+                  _buildSectionTitle('Manajemen Data'),
+                  const SizedBox(height: 16),
+                  _buildManagementList(context),
+                ],
+              ),
             ),
           ),
         ),
@@ -51,7 +133,7 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String name) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -63,7 +145,7 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
         ),
         Text(
-          'Administrator',
+          name,
           style: GoogleFonts.poppins(
             color: AppColors.textPrimary,
             fontSize: 26,
@@ -83,10 +165,10 @@ class AdminDashboardScreen extends StatelessWidget {
       mainAxisSpacing: 16,
       childAspectRatio: 1.3,
       children: [
-        _buildSummaryCard('Total Santri', '320', Icons.school_outlined),
-        _buildSummaryCard('Pengurus', '12', Icons.people_alt_outlined),
-        _buildSummaryCard('Wali Santri', '285', Icons.favorite_outline),
-        _buildSummaryCard('Aktif Hari Ini', '98%', Icons.trending_up_rounded),
+        _buildSummaryCard('Total Santri', _isLoading ? '...' : '$_totalSantri', Icons.school_outlined),
+        _buildSummaryCard('Pengurus', _isLoading ? '...' : '$_totalPengurus', Icons.people_alt_outlined),
+        _buildSummaryCard('Wali Santri', _isLoading ? '...' : '$_totalWali', Icons.favorite_outline),
+        _buildSummaryCard('Kehadiran Hari Ini', _isLoading ? '...' : '${_attendanceRate.toStringAsFixed(0)}%', Icons.trending_up_rounded),
       ],
     );
   }
@@ -163,7 +245,7 @@ class AdminDashboardScreen extends StatelessWidget {
           'Kelola Pengguna', 
           'Tambah & edit akun santri, wali, & pengurus', 
           Icons.manage_accounts_outlined,
-          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KelolaPenggunaScreen())),
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KelolaPenggunaScreen())).then((_) => _loadStats()),
         ),
         const SizedBox(height: 12),
         _buildMenuItem(
@@ -244,6 +326,7 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
+              AuthService.logout();
               Navigator.pop(ctx);
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),

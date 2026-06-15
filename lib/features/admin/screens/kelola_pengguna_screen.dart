@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
+import 'package:santriku_app/features/admin/admin.dart';
 
 class KelolaPenggunaScreen extends StatefulWidget {
   const KelolaPenggunaScreen({super.key});
@@ -12,26 +13,94 @@ class KelolaPenggunaScreen extends StatefulWidget {
 class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
   String _selectedFilter = 'Semua';
   final List<String> _filters = ['Semua', 'Santri', 'Pengurus', 'Wali'];
+  
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _mergedUsers = [];
+  List<Map<String, dynamic>> _waliList = []; // List of Wali users for dropdown selection
 
-  final List<Map<String, String>> _users = [
-    {'name': 'Ahmad Fauzi', 'role': 'Santri', 'status': 'Aktif'},
-    {'name': 'Ust. Hasanuddin', 'role': 'Pengurus', 'status': 'Aktif'},
-    {'name': 'Bpk. Budi Santoso', 'role': 'Wali', 'status': 'Nonaktif'},
-    {'name': 'Muhammad Fatih', 'role': 'Santri', 'status': 'Aktif'},
-    {'name': 'Ibu Siti Aminah', 'role': 'Wali', 'status': 'Aktif'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
 
-  void _showUserDialog({int? index}) {
-    final isEdit = index != null;
-    final nameController = TextEditingController(text: isEdit ? _users[index]['name'] : '');
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
+
+    final rawUsers = await AdminService.getUsers();
+    final rawSantris = await AdminService.getSantris();
+
+    final usersMapped = rawUsers.map((u) {
+      final roles = List<String>.from(u['roles'] ?? []);
+      String displayRole = 'Admin';
+      if (roles.contains('pengurus')) displayRole = 'Pengurus';
+      if (roles.contains('wali_santri')) displayRole = 'Wali';
+      return {
+        'id': u['id'],
+        'name': u['name'] ?? '',
+        'email': u['email'] ?? '',
+        'username': u['username'] ?? '',
+        'role': displayRole,
+        'status': 'Aktif',
+        'is_santri': false,
+        'raw': u,
+      };
+    }).toList();
+
+    final santrisMapped = rawSantris.map((s) {
+      return {
+        'id': s['id'],
+        'name': s['name'] ?? '',
+        'nis': s['nis'] ?? '',
+        'wali_id': s['wali_id'],
+        'qr_token': s['qr_token'] ?? '',
+        'role': 'Santri',
+        'status': 'Aktif',
+        'is_santri': true,
+        'raw': s,
+      };
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _mergedUsers = [...usersMapped, ...santrisMapped];
+        _waliList = usersMapped.where((u) => u['role'] == 'Wali').toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showUserDialog({Map<String, dynamic>? item}) {
+    final isEdit = item != null;
+    final isSantri = isEdit && (item['is_santri'] as bool);
+
+    // Controllers
+    final nameController = TextEditingController(text: isEdit ? item['name'] : '');
+    final emailController = TextEditingController(text: (isEdit && !isSantri) ? item['email'] : '');
+    final usernameController = TextEditingController(text: (isEdit && !isSantri) ? item['username'] : '');
     final passwordController = TextEditingController();
-    String selectedRole = isEdit ? _users[index]['role']! : 'Santri';
+
+    // Santri specific
+    final nisController = TextEditingController(text: (isEdit && isSantri) ? item['nis'] : '');
+    final qrController = TextEditingController(text: (isEdit && isSantri) ? item['qr_token'] : '');
+    int? selectedWaliId = (isEdit && isSantri) ? item['wali_id'] : null;
+
+    String selectedRole = isEdit ? item['role']! : 'Santri';
+
+    // Auto-generate QR Token when typing NIS
+    nisController.addListener(() {
+      if (!isEdit && selectedRole == 'Santri') {
+        qrController.text = 'santri_${nameController.text.toLowerCase().replaceAll(' ', '_')}_${nisController.text}';
+      }
+    });
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isRoleSantri = selectedRole == 'Santri';
+
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               backgroundColor: Colors.white,
@@ -39,52 +108,152 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                 isEdit ? 'Edit Pengguna' : 'Tambah Pengguna',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: AppColors.primaryDark),
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
-                      decoration: InputDecoration(
-                        labelText: 'NAMA LENGKAP',
-                        hintText: 'Masukkan nama lengkap',
-                        labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600),
-                        filled: true,
-                        fillColor: const Color(0xFFF5F7F6),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Role Selector (Only editable on Create)
+                      if (!isEdit) ...[
+                        DropdownButtonFormField<String>(
+                          value: selectedRole,
+                          decoration: InputDecoration(
+                            labelText: 'ROLE PENGGUNA',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          items: ['Santri', 'Pengurus', 'Wali'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setDialogState(() => selectedRole = v);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      
+                      // Full Name
+                      TextField(
+                        controller: nameController,
+                        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
+                        decoration: InputDecoration(
+                          labelText: 'NAMA LENGKAP',
+                          hintText: 'Masukkan nama lengkap',
+                          labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                          filled: true,
+                          fillColor: const Color(0xFFF5F7F6),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRole,
-                      decoration: InputDecoration(
-                        labelText: 'ROLE PENGGUNA',
-                        labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600),
-                        filled: true,
-                        fillColor: const Color(0xFFF5F7F6),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      items: ['Santri', 'Pengurus', 'Wali'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => selectedRole = v);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
-                      decoration: InputDecoration(
-                        labelText: 'PASSWORD',
-                        hintText: isEdit ? 'Kosongkan jika tidak diubah' : 'Masukkan password',
-                        labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600),
-                        filled: true,
-                        fillColor: const Color(0xFFF5F7F6),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+
+                      if (isRoleSantri) ...[
+                        // NIS
+                        TextField(
+                          controller: nisController,
+                          keyboardType: TextInputType.number,
+                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
+                          decoration: InputDecoration(
+                            labelText: 'NIS (NOMOR INDUK SANTRI)',
+                            hintText: 'Masukkan NIS',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+
+
+                        // Wali Dropdown
+                        DropdownButtonFormField<int>(
+                          value: selectedWaliId,
+                          decoration: InputDecoration(
+                            labelText: 'WALI SANTRI (ORANG TUA)',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          items: [
+                            const DropdownMenuItem<int>(value: null, child: Text('Tanpa Wali (Belum terhubung)')),
+                            ..._waliList.map((w) => DropdownMenuItem<int>(
+                                  value: w['id'],
+                                  child: Text(w['name']),
+                                )),
+                          ],
+                          onChanged: (v) {
+                            setDialogState(() => selectedWaliId = v);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // QR Token
+                        TextField(
+                          controller: qrController,
+                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
+                          decoration: InputDecoration(
+                            labelText: 'QR TOKEN',
+                            hintText: 'Token unik kartu santri',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ] else ...[
+                        // Email
+                        TextField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
+                          decoration: InputDecoration(
+                            labelText: 'EMAIL',
+                            hintText: 'Masukkan alamat email',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Username
+                        TextField(
+                          controller: usernameController,
+                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
+                          decoration: InputDecoration(
+                            labelText: 'USERNAME',
+                            hintText: 'Masukkan username',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Password
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.primaryDark),
+                          decoration: InputDecoration(
+                            labelText: 'PASSWORD',
+                            hintText: isEdit ? 'Kosongkan jika tidak diubah' : 'Masukkan password (min. 6 karakter)',
+                            labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F7F6),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -93,35 +262,90 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                   child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    if (nameController.text.trim().isEmpty) {
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Nama tidak boleh kosong!'), backgroundColor: AppColors.error),
                       );
                       return;
                     }
-                    Navigator.pop(context);
-                    setState(() {
-                      if (isEdit) {
-                        _users[index] = {
-                          'name': nameController.text.trim(),
-                          'role': selectedRole,
-                          'status': _users[index]['status']!,
-                        };
-                      } else {
-                        _users.add({
-                          'name': nameController.text.trim(),
-                          'role': selectedRole,
-                          'status': 'Aktif',
-                        });
+
+                    Map<String, dynamic> result = {};
+
+                    if (isRoleSantri) {
+                      final nis = nisController.text.trim();
+                      final qrToken = qrController.text.trim();
+
+                      if (nis.isEmpty || qrToken.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('NIS dan QR Token harus diisi!'), backgroundColor: AppColors.error),
+                        );
+                        return;
                       }
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isEdit ? 'Pengguna berhasil diperbarui!' : 'Pengguna berhasil ditambahkan!'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
+
+                      final data = {
+                        'name': name,
+                        'nis': nis,
+                        'wali_id': selectedWaliId,
+                        'qr_token': qrToken,
+                      };
+
+                      if (isEdit) {
+                        result = await AdminService.updateSantri(item['id'], data);
+                      } else {
+                        result = await AdminService.createSantri(data);
+                      }
+                    } else {
+                      final email = emailController.text.trim();
+                      final username = usernameController.text.trim();
+                      final password = passwordController.text;
+
+                      if (email.isEmpty || username.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Email dan Username harus diisi!'), backgroundColor: AppColors.error),
+                        );
+                        return;
+                      }
+
+                      if (!isEdit && password.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Password minimal 6 karakter!'), backgroundColor: AppColors.error),
+                        );
+                        return;
+                      }
+
+                      final data = {
+                        'name': name,
+                        'email': email,
+                        'username': username,
+                        'role': selectedRole == 'Pengurus' ? 'pengurus' : 'wali_santri',
+                      };
+
+                      if (password.isNotEmpty) {
+                        data['password'] = password;
+                      }
+
+                      if (isEdit) {
+                        result = await AdminService.updateUser(item['id'], data);
+                      } else {
+                        result = await AdminService.createUser(data);
+                      }
+                    }
+
+                    if (context.mounted) {
+                      if (result['success'] == true) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result['message']), backgroundColor: AppColors.success),
+                        );
+                        _fetchData();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result['message'] ?? 'Terjadi kesalahan'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryDark,
@@ -137,28 +361,62 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
     );
   }
 
-  void _toggleUserStatus(int index) {
-    setState(() {
-      final currentStatus = _users[index]['status'];
-      _users[index] = {
-        ..._users[index],
-        'status': currentStatus == 'Aktif' ? 'Nonaktif' : 'Aktif',
-      };
-    });
-    final newStatus = _users[index]['status'];
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Status ${_users[index]['name']} diubah ke $newStatus'),
-        backgroundColor: newStatus == 'Aktif' ? AppColors.success : AppColors.warning,
+  void _deleteUser(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Hapus Pengguna', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: AppColors.error)),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus "${item['name']}"? Tindakan ini tidak dapat dibatalkan.',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _isLoading = true);
+
+              Map<String, dynamic> result;
+              if (item['is_santri'] as bool) {
+                result = await AdminService.deleteSantri(item['id']);
+              } else {
+                result = await AdminService.deleteUser(item['id']);
+              }
+
+              if (mounted) {
+                if (result['success']) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result['message']), backgroundColor: AppColors.success),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result['message'] ?? 'Gagal menghapus'), backgroundColor: AppColors.error),
+                  );
+                }
+                _fetchData();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Hapus', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredUsers = _selectedFilter == 'Semua' 
-        ? _users 
-        : _users.where((u) => u['role'] == _selectedFilter).toList();
+    final filteredUsers = _selectedFilter == 'Semua'
+        ? _mergedUsers
+        : _mergedUsers.where((u) => u['role'] == _selectedFilter).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F6),
@@ -190,7 +448,9 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                       label: Text(filter, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
                       selectedColor: AppColors.primaryLight,
                       checkmarkColor: AppColors.primaryDark,
-                      labelStyle: TextStyle(color: isSelected ? AppColors.primaryDark : Colors.grey[600]),
+                      labelStyle: TextStyle(
+                        color: isSelected ? AppColors.primaryDark : AppColors.primaryDark.withValues(alpha: 0.6),
+                      ),
                       onSelected: (val) {
                         setState(() => _selectedFilter = filter);
                       },
@@ -201,86 +461,120 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: filteredUsers.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final user = filteredUsers[index];
-                final isActive = user['status'] == 'Aktif';
-                // Find the real index in _users for editing
-                final realIndex = _users.indexOf(user);
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: isActive ? const Color(0xFFE8F2EF) : const Color(0xFFFDE8E8),
-                      child: Icon(
-                        Icons.person,
-                        color: isActive ? AppColors.primaryDark : AppColors.error,
-                      ),
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryDark,
                     ),
-                    title: Text(
-                      user['name']!,
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.textDark),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F7F6),
-                              borderRadius: BorderRadius.circular(8),
+                  )
+                : filteredUsers.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Tidak ada pengguna ditemukan',
+                              style: GoogleFonts.poppins(color: Colors.grey, fontSize: 16),
                             ),
-                            child: Text(
-                              user['role']!,
-                              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[700]),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            user['status']!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: isActive ? AppColors.success : AppColors.error,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _fetchData,
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.primaryDark,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: filteredUsers.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final user = filteredUsers[index];
+                            final isSantri = user['is_santri'] as bool;
+                            final isActive = user['status'] == 'Aktif';
+
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.02),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                leading: CircleAvatar(
+                                  backgroundColor: isSantri ? const Color(0xFFE3F2FD) : const Color(0xFFE8F2EF),
+                                  child: Icon(
+                                    isSantri ? Icons.school_rounded : Icons.person,
+                                    color: isSantri ? Colors.blue.shade700 : AppColors.primaryDark,
+                                  ),
+                                ),
+                                title: Text(
+                                  user['name']!,
+                                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: const Color(0xFF1E2925)),
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4.0),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE8F2EF), // visible background
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          user['role']!,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11, 
+                                            color: AppColors.primaryDark, // highly visible dark color
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (!isSantri) ...[
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          user['status']!,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            color: isActive ? AppColors.success : AppColors.error,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert_rounded),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  onSelected: (val) {
+                                    if (val == 'edit') {
+                                      _showUserDialog(item: user);
+                                    } else if (val == 'delete') {
+                                      _deleteUser(user);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                    const PopupMenuItem(
+                                      value: 'delete', 
+                                      child: Text('Hapus', style: TextStyle(color: AppColors.error)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    trailing: PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      onSelected: (val) {
-                        if (val == 'edit') {
-                          _showUserDialog(index: realIndex);
-                        } else {
-                          _toggleUserStatus(realIndex);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'status', child: Text(isActive ? 'Nonaktifkan' : 'Aktifkan')),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ),
