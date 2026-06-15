@@ -57,7 +57,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      initialValue: selectedRole,
+                      value: selectedRole,
                       decoration: InputDecoration(
                         labelText: 'ROLE PENGGUNA',
                         labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600),

@@ -9,6 +9,7 @@ import 'package:santriku_app/features/auth/widgets/role_selector.dart';
 import 'package:santriku_app/features/admin/admin.dart';
 import 'package:santriku_app/features/pengurus/pengurus.dart';
 import 'package:santriku_app/features/wali/wali.dart';
+import 'package:santriku_app/features/auth/services/auth_service.dart';
 
 /// Halaman login aplikasi Santriku.
 ///
@@ -78,15 +79,43 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── Actions ─────────────────────────────────────────────
 
-  void _handleLogin() {
+  void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    // TODO: Ganti dengan pemanggilan API / Firebase Auth
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    final result = await AuthService.login(
+      _emailController.text,
+      _passwordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result['success']) {
+      final user = result['user'] as Map<String, dynamic>;
+      final List<dynamic> roles = user['roles'] ?? [];
+      
+      // Validasi apakah role yang dikembalikan cocok dengan pilihan role di UI
+      String mappedRole = _selectedRole.name;
+      if (mappedRole == 'wali') mappedRole = 'wali_santri';
+
+      if (!roles.contains(mappedRole)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Anda tidak memiliki akses sebagai ${_selectedRole.fullName}!',
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+        AuthService.logout();
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -118,7 +147,20 @@ class _LoginScreenState extends State<LoginScreen>
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => dashboard),
       );
-    });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result['message'] ?? 'Login gagal!',
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 
   // ── Build ───────────────────────────────────────────────
