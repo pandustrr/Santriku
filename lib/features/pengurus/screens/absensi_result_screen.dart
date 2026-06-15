@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
 
-/// Halaman hasil scan absensi / konsumsi santri.
 class AbsensiResultScreen extends StatelessWidget {
   final bool isAbsensi;
   final String santriName;
@@ -22,6 +21,14 @@ class AbsensiResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.primaryDark,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -30,13 +37,10 @@ class AbsensiResultScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(),
-
-                // Ikon Status
                 Container(
                   width: 100,
                   height: 100,
@@ -54,10 +58,7 @@ class AbsensiResultScreen extends StatelessWidget {
                     size: 56,
                   ),
                 ),
-
                 const SizedBox(height: 32),
-
-                // Judul Result
                 Text(
                   isSuccess ? 'Pemindaian Berhasil' : 'Pemindaian Gagal',
                   style: GoogleFonts.poppins(
@@ -74,10 +75,7 @@ class AbsensiResultScreen extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-
                 const SizedBox(height: 48),
-
-                // Card Info Detail
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -96,15 +94,12 @@ class AbsensiResultScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 const Spacer(),
-
-                // Tombol Selesai
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isSuccess ? AppColors.accent : AppColors.primaryLight,
                       foregroundColor: AppColors.primaryDarker,
@@ -118,6 +113,7 @@ class AbsensiResultScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),

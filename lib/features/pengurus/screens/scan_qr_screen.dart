@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:santriku_app/core/core.dart';
+import 'absensi_result_screen.dart';
 
 /// Halaman Scan QR Code untuk Absensi & Jatah Konsumsi.
 ///
@@ -17,7 +18,7 @@ class ScanQrScreen extends StatefulWidget {
 class _ScanQrScreenState extends State<ScanQrScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _laserController;
-  bool _hasScanned = true; // Menandakan apakah QR code sudah disimulasikan terbaca
+  bool _hasScanned = false; // Mulai dalam mode belum scan
 
   @override
   void initState() {
@@ -25,7 +26,10 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     _laserController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
-    )..repeat(reverse: true);
+    );
+    if (!_hasScanned) {
+      _laserController.repeat(reverse: true);
+    }
   }
 
   @override
@@ -35,33 +39,35 @@ class _ScanQrScreenState extends State<ScanQrScreen>
   }
 
   void _triggerScanSimulation() {
+    _laserController.stop();
     setState(() {
       _hasScanned = true;
     });
   }
 
   void _resetScan() {
+    _laserController.repeat(reverse: true);
     setState(() {
       _hasScanned = false;
     });
   }
 
   void _saveData() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.isAbsensi 
-              ? 'Absensi Ahmad Fauzi berhasil disimpan!' 
-              : 'Jatah makan malam Ahmad Fauzi berhasil diambil!',
-        ),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+    final now = DateTime.now();
+    final formattedTime =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AbsensiResultScreen(
+          isAbsensi: widget.isAbsensi,
+          santriName: 'Ahmad Fauzi',
+          status: widget.isAbsensi ? 'Hadir' : 'Makan Malam',
+          timestamp: formattedTime,
+          isSuccess: true,
         ),
       ),
     );
-    Navigator.of(context).pop();
   }
 
   @override
@@ -118,10 +124,13 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Color(0xFF1E2925),
-                size: 18,
+              child: const Padding(
+                padding: EdgeInsets.only(right: 2.0),
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Color(0xFF1E2925),
+                  size: 18,
+                ),
               ),
             ),
           ),
@@ -704,10 +713,28 @@ class _ScanQrScreenState extends State<ScanQrScreen>
         children: [
           // Left Small Button
           ElevatedButton(
-            onPressed: _resetScan,
+            onPressed: widget.isAbsensi
+                ? _resetScan
+                : () {
+                    // Tolak jatah konsumsi — navigasi ke result gagal
+                    final now = DateTime.now();
+                    final formattedTime =
+                        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => AbsensiResultScreen(
+                          isAbsensi: false,
+                          santriName: 'Ahmad Fauzi',
+                          status: 'Ditolak',
+                          timestamp: formattedTime,
+                          isSuccess: false,
+                        ),
+                      ),
+                    );
+                  },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF0F2F1),
-              foregroundColor: const Color(0xFF1E2925),
+              backgroundColor: widget.isAbsensi ? const Color(0xFFF0F2F1) : const Color(0xFFFDE8E8),
+              foregroundColor: widget.isAbsensi ? const Color(0xFF1E2925) : AppColors.error,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               shape: RoundedRectangleBorder(
@@ -725,6 +752,8 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
                   ),
                 ] else ...[
+                  const Icon(Icons.close_rounded, size: 18),
+                  const SizedBox(width: 6),
                   Text(
                     'Tolak',
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),

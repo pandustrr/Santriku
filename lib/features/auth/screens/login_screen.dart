@@ -115,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen>
           break;
       }
 
-      Navigator.of(context).push(
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => dashboard),
       );
     });
