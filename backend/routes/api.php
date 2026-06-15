@@ -45,3 +45,12 @@ Route::middleware(['auth:sanctum'])->prefix('pengurus')->group(function () {
     Route::get('dashboard-stats', [PengurusController::class, 'getDashboardStats']);
     Route::get('activity-logs', [PengurusController::class, 'getActivityLogs']);
 });
+
+use App\Http\Controllers\WaliController;
+
+Route::middleware(['auth:sanctum'])->prefix('wali')->group(function () {
+    Route::get('santri', [WaliController::class, 'getSantris']);
+    Route::get('santri/{id}/dashboard', [WaliController::class, 'getDashboardStats']);
+    Route::get('santri/{id}/permissions', [WaliController::class, 'getPermissions']);
+    Route::post('santri/{id}/permissions', [WaliController::class, 'storePermission']);
+});
