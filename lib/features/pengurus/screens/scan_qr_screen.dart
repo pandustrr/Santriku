@@ -356,11 +356,12 @@ class _ScanQrScreenState extends State<ScanQrScreen>
           );
         } else {
           final errMsg = data['message'] ?? 'Proses gagal.';
-          Navigator.of(context).push(
+          final errSantriName = data['santri_name'] ?? '-';
+          Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => AbsensiResultScreen(
                 isAbsensi: widget.isAbsensi,
-                santriName: data['santri_name'] ?? '-',
+                santriName: errSantriName,
                 status: errMsg,
                 timestamp: formattedTime,
                 isSuccess: false,

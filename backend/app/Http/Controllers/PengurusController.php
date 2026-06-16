@@ -57,6 +57,20 @@ class PengurusController extends Controller
             ], 404);
         }
 
+        // Check for double attendance today
+        $today = date('Y-m-d');
+        $existingAttendance = Absensi::where('santri_id', $santri->id)
+            ->whereDate('waktu_absen', $today)
+            ->first();
+
+        if ($existingAttendance) {
+            $formattedTime = date('H:i', strtotime($existingAttendance->waktu_absen));
+            return response()->json([
+                'santri_name' => $santri->name,
+                'message' => 'Gagal: Santri ' . $santri->name . ' sudah melakukan absensi hari ini pada ' . $formattedTime . ' WIB.'
+            ], 400);
+        }
+
         // 4. Geofencing check (Dynamic settings)
         $filePath = storage_path('app/settings.json');
         if (file_exists($filePath)) {
@@ -152,6 +166,7 @@ class PengurusController extends Controller
         if ($existingClaim) {
             $formattedTime = date('H:i', strtotime($existingClaim->waktu_ambil));
             return response()->json([
+                'santri_name' => $santri->name,
                 'message' => 'Gagal: Jatah makan ' . strtolower($jenisMakan) . ' sudah diambil oleh ' . $santri->name . ' pada ' . $formattedTime . ' WIB.'
             ], 400);
         }
