@@ -137,6 +137,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                       if (!isEdit) ...[
                         DropdownButtonFormField<String>(
                           value: selectedRole,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'ROLE PENGGUNA',
                             labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
@@ -144,7 +145,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                             fillColor: const Color(0xFFF5F7F6),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                           ),
-                          items: ['Santri', 'Pengurus', 'Wali'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                          items: ['Santri', 'Pengurus', 'Wali'].map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) {
                             if (v != null) {
                               setDialogState(() => selectedRole = v);
@@ -191,6 +192,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                         // Wali Dropdown
                         DropdownButtonFormField<int>(
                           value: selectedWaliId,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'WALI SANTRI (ORANG TUA)',
                             labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
@@ -199,10 +201,19 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           items: [
-                            const DropdownMenuItem<int>(value: null, child: Text('Tanpa Wali (Belum terhubung)')),
+                            const DropdownMenuItem<int>(
+                              value: null,
+                              child: Text(
+                                'Tanpa Wali (Belum terhubung)',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             ..._waliList.map((w) => DropdownMenuItem<int>(
                                   value: w['id'],
-                                  child: Text(w['name']),
+                                  child: Text(
+                                    w['name']?.toString() ?? '',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 )),
                           ],
                           onChanged: (v) {

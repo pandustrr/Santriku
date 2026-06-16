@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -32,7 +31,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
   String? _selectedJenisIzin = 'Sakit';
   List<Map<String, dynamic>> _santriList = [];
 
-  File? _buktiFile;
+  XFile? _buktiFile;
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -87,7 +86,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
       );
       if (image != null) {
         setState(() {
-          _buktiFile = File(image.path);
+          _buktiFile = image;
         });
       }
     } catch (e) {
@@ -168,7 +167,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
             colorScheme: const ColorScheme.light(
               primary: AppColors.primaryDark,
               onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
+              onSurface: AppColors.primaryDarker,
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(foregroundColor: AppColors.primaryDark),
@@ -413,7 +412,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
               const SizedBox(height: 12),
               Text(
                 hasFile
-                    ? 'Gambar terpilih: ${_buktiFile!.path.split(Platform.pathSeparator).last}'
+                    ? 'Gambar terpilih: ${_buktiFile!.name}'
                     : 'Upload Bukti Pendukung (Opsional)',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(

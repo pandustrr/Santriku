@@ -227,6 +227,34 @@ class AdminController extends Controller
     }
 
     /**
+     * Calculate active days in a month up to today (excluding Sundays).
+     */
+    private function calculateActiveDays($month, $year)
+    {
+        $currentMonth = (int)date('m');
+        $currentYear = (int)date('Y');
+        
+        if ($year < $currentYear || ($year == $currentYear && $month < $currentMonth)) {
+            $lastDay = (int)date('t', strtotime("$year-$month-01"));
+        } elseif ($year == $currentYear && $month == $currentMonth) {
+            $lastDay = (int)date('d');
+        } else {
+            return 0; // Future month
+        }
+
+        $activeDays = 0;
+        for ($day = 1; $day <= $lastDay; $day++) {
+            $timestamp = strtotime("$year-$month-$day");
+            $dayOfWeek = date('N', $timestamp);
+            if ($dayOfWeek != 7) { // 7 is Sunday
+                $activeDays++;
+            }
+        }
+
+        return $activeDays;
+    }
+
+    /**
      * Get monthly attendance report for all students.
      */
     public function getAttendanceReport(Request $request)
@@ -238,6 +266,7 @@ class AdminController extends Controller
 
         $santris = Santri::all();
         $report = [];
+        $activeDays = $this->calculateActiveDays($month, $year);
 
         foreach ($santris as $santri) {
             // Count Hadir
@@ -267,9 +296,7 @@ class AdminController extends Controller
                 })
                 ->count();
 
-            // Alpha calculation: assume 25 active days max.
-            // Alpha = max(0, 25 - hadir - sakit - izin)
-            $activeDays = 25;
+            // Alpha = max(0, activeDays - hadir - sakit - izin)
             $alpha = max(0, $activeDays - $hadir - $sakit - $izin);
 
             $report[] = [
@@ -340,5 +367,134 @@ class AdminController extends Controller
             'message' => 'Pengaturan GPS berhasil diperbarui',
             'settings' => $data
         ]);
+    }
+
+    /**
+     * Get monthly consumption report for all students.
+     */
+    public function getConsumptionReport(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $month = $request->query('month', date('m'));
+        $year = $request->query('year', date('Y'));
+
+        $santris = Santri::all();
+        $data = [];
+        $totalSarapan = 0;
+        $totalSiang = 0;
+        $totalMalam = 0;
+
+        foreach ($santris as $santri) {
+            $sarapan = \App\Models\Konsumsi::where('santri_id', $santri->id)
+                ->where('jenis_makan', 'Sarapan')
+                ->whereMonth('tanggal', $month)
+                ->whereYear('tanggal', $year)
+                ->count();
+
+            $siang = \App\Models\Konsumsi::where('santri_id', $santri->id)
+                ->where('jenis_makan', 'Siang')
+                ->whereMonth('tanggal', $month)
+                ->whereYear('tanggal', $year)
+                ->count();
+
+            $malam = \App\Models\Konsumsi::where('santri_id', $santri->id)
+                ->where('jenis_makan', 'Malam')
+                ->whereMonth('tanggal', $month)
+                ->whereYear('tanggal', $year)
+                ->count();
+
+            $data[] = [
+                'nama' => $santri->name,
+                'sarapan' => $sarapan,
+                'siang' => $siang,
+                'malam' => $malam,
+            ];
+
+            $totalSarapan += $sarapan;
+            $totalSiang += $siang;
+            $totalMalam += $malam;
+        }
+
+        return response()->json([
+            'data' => $data,
+            'summary' => [
+                'total_sarapan' => $totalSarapan,
+                'total_siang' => $totalSiang,
+                'total_malam' => $totalMalam,
+            ]
+        ]);
+    }
+
+    /**
+     * Get system activity logs.
+     */
+    public function getActivityLogs(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $date = $request->query('date');
+
+        if ($date) {
+            $attendanceQuery = \App\Models\Absensi::with(['santri', 'pengurus'])->whereDate('waktu_absen', $date);
+            $consumptionQuery = \App\Models\Konsumsi::with(['santri', 'pengurus'])->whereDate('tanggal', $date);
+            $perizinanQuery = \App\Models\Perizinan::with(['santri', 'wali', 'approver'])->whereDate('created_at', $date);
+            $userQuery = User::with('roles')->whereDate('created_at', $date);
+        } else {
+            $attendanceQuery = \App\Models\Absensi::with(['santri', 'pengurus'])->orderBy('waktu_absen', 'desc')->limit(30);
+            $consumptionQuery = \App\Models\Konsumsi::with(['santri', 'pengurus'])->orderBy('waktu_ambil', 'desc')->limit(30);
+            $perizinanQuery = \App\Models\Perizinan::with(['santri', 'wali', 'approver'])->orderBy('created_at', 'desc')->limit(30);
+            $userQuery = User::with('roles')->orderBy('created_at', 'desc')->limit(15);
+        }
+
+        $logs = collect();
+
+        $attendanceQuery->get()->each(function ($item) use ($logs) {
+            $logs->push([
+                'type' => 'attendance',
+                'user' => $item->pengurus->name ?? 'Pengurus',
+                'description' => "Mencatat absensi " . ($item->santri->name ?? 'Santri') . " (" . $item->status . ")",
+                'created_at' => $item->waktu_absen,
+            ]);
+        });
+
+        $consumptionQuery->get()->each(function ($item) use ($logs) {
+            $logs->push([
+                'type' => 'consumption',
+                'user' => $item->pengurus->name ?? 'Pengurus',
+                'description' => "Mencatat klaim konsumsi " . ($item->santri->name ?? 'Santri') . ": " . $item->jenis_makan,
+                'created_at' => $item->waktu_ambil,
+            ]);
+        });
+
+        $perizinanQuery->get()->each(function ($item) use ($logs) {
+            $actorName = $item->approver ? $item->approver->name : ($item->wali->name ?? 'Wali Santri');
+            $statusText = $item->status === 'Pending' 
+                ? "Mengajukan izin " . $item->jenis_izin . " untuk " . ($item->santri->name ?? 'Santri')
+                : "Memperbarui status izin " . $item->jenis_izin . " untuk " . ($item->santri->name ?? 'Santri') . " menjadi " . $item->status;
+            $logs->push([
+                'type' => 'permission',
+                'user' => $actorName,
+                'description' => $statusText,
+                'created_at' => $item->updated_at ? $item->updated_at->toIso8601String() : $item->created_at->toIso8601String(),
+            ]);
+        });
+
+        $userQuery->get()->each(function ($item) use ($logs) {
+            $roleName = $item->getRoleNames()->first() ?? 'User';
+            $logs->push([
+                'type' => 'user_create',
+                'user' => 'Admin',
+                'description' => "Membuat pengguna baru: " . $item->name . " sebagai " . $roleName,
+                'created_at' => $item->created_at->toIso8601String(),
+            ]);
+        });
+
+        $sortedLogs = $logs->sortByDesc('created_at')->values();
+        if (!$date) {
+            $sortedLogs = $sortedLogs->take(50);
+        }
+
+        return response()->json($sortedLogs);
     }
 }

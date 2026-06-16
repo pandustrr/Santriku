@@ -32,6 +32,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::put('santri/{id}', [AdminController::class, 'updateSantri']);
     Route::delete('santri/{id}', [AdminController::class, 'destroySantri']);
     Route::get('attendance-report', [AdminController::class, 'getAttendanceReport']);
+    Route::get('consumption-report', [AdminController::class, 'getConsumptionReport']);
+    Route::get('activity-logs', [AdminController::class, 'getActivityLogs']);
     Route::put('settings', [AdminController::class, 'updateSettings']);
 });
 

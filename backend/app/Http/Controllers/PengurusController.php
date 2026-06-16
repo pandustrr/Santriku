@@ -8,11 +8,7 @@ use App\Models\Absensi;
 
 class PengurusController extends Controller
 {
-    // Pesantren Titik Pusat Koordinat (Default: Jember / Jatim)
-    // Bisa disesuaikan via ENV atau default value ini
-    private const PESANTREN_LAT = -8.12345;
-    private const PESANTREN_LON = 113.12345;
-    private const MAX_RADIUS_METERS = 100.0; // 100 meters radius
+
 
     /**
      * Helper to calculate distance between two coordinates in meters (Haversine formula).
@@ -61,15 +57,31 @@ class PengurusController extends Controller
             ], 404);
         }
 
-        // 4. Geofencing check
+        // 4. Geofencing check (Dynamic settings)
+        $filePath = storage_path('app/settings.json');
+        if (file_exists($filePath)) {
+            $settings = json_decode(file_get_contents($filePath), true);
+        } else {
+            // Default: Fasilkom UNEJ
+            $settings = [
+                'latitude' => -8.164667,
+                'longitude' => 113.717056,
+                'radius' => 100.0,
+            ];
+        }
+
+        $pesantrenLat = $settings['latitude'] ?? -8.164667;
+        $pesantrenLon = $settings['longitude'] ?? 113.717056;
+        $maxRadius = $settings['radius'] ?? 100.0;
+
         $distance = $this->calculateDistance(
-            self::PESANTREN_LAT,
-            self::PESANTREN_LON,
+            $pesantrenLat,
+            $pesantrenLon,
             $request->latitude,
             $request->longitude
         );
 
-        $isInRange = $distance <= self::MAX_RADIUS_METERS;
+        $isInRange = $distance <= $maxRadius;
 
         if (!$isInRange) {
             return response()->json([
