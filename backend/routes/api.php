@@ -31,4 +31,32 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::post('santri', [AdminController::class, 'storeSantri']);
     Route::put('santri/{id}', [AdminController::class, 'updateSantri']);
     Route::delete('santri/{id}', [AdminController::class, 'destroySantri']);
+    Route::get('attendance-report', [AdminController::class, 'getAttendanceReport']);
+    Route::get('consumption-report', [AdminController::class, 'getConsumptionReport']);
+    Route::get('activity-logs', [AdminController::class, 'getActivityLogs']);
+    Route::put('settings', [AdminController::class, 'updateSettings']);
+});
+
+Route::middleware('auth:sanctum')->get('settings', [AdminController::class, 'getSettings']);
+
+use App\Http\Controllers\PengurusController;
+
+Route::middleware(['auth:sanctum'])->prefix('pengurus')->group(function () {
+    Route::post('attendance', [PengurusController::class, 'storeAttendance']);
+    Route::post('consumption', [PengurusController::class, 'storeConsumption']);
+    Route::get('permissions', [PengurusController::class, 'getPermissions']);
+    Route::put('permissions/{id}', [PengurusController::class, 'updatePermissionStatus']);
+    Route::get('consumption-stats', [PengurusController::class, 'getConsumptionStats']);
+    Route::post('consumption-stats', [PengurusController::class, 'storeConsumptionStats']);
+    Route::get('dashboard-stats', [PengurusController::class, 'getDashboardStats']);
+    Route::get('activity-logs', [PengurusController::class, 'getActivityLogs']);
+});
+
+use App\Http\Controllers\WaliController;
+
+Route::middleware(['auth:sanctum'])->prefix('wali')->group(function () {
+    Route::get('santri', [WaliController::class, 'getSantris']);
+    Route::get('santri/{id}/dashboard', [WaliController::class, 'getDashboardStats']);
+    Route::get('santri/{id}/permissions', [WaliController::class, 'getPermissions']);
+    Route::post('santri/{id}/permissions', [WaliController::class, 'storePermission']);
 });

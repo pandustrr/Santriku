@@ -4,14 +4,15 @@ import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/admin/admin.dart';
 
 class KelolaPenggunaScreen extends StatefulWidget {
-  const KelolaPenggunaScreen({super.key});
+  final String initialFilter;
+  const KelolaPenggunaScreen({super.key, this.initialFilter = 'Semua'});
 
   @override
   State<KelolaPenggunaScreen> createState() => _KelolaPenggunaScreenState();
 }
 
 class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
-  String _selectedFilter = 'Semua';
+  late String _selectedFilter;
   final List<String> _filters = ['Semua', 'Santri', 'Pengurus', 'Wali'];
   
   bool _isLoading = true;
@@ -21,6 +22,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedFilter = widget.initialFilter;
     _fetchData();
   }
 
@@ -35,12 +37,24 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
       String displayRole = 'Admin';
       if (roles.contains('pengurus')) displayRole = 'Pengurus';
       if (roles.contains('wali_santri')) displayRole = 'Wali';
+
+      // Find children names linked to this parent
+      String childrenNames = '';
+      if (displayRole == 'Wali') {
+        final childrenList = rawSantris
+            .where((s) => s['wali_id'] == u['id'])
+            .map((s) => s['name'] ?? '')
+            .toList();
+        childrenNames = childrenList.isEmpty ? 'Belum terhubung dengan anak' : childrenList.join(', ');
+      }
+
       return {
         'id': u['id'],
         'name': u['name'] ?? '',
         'email': u['email'] ?? '',
         'username': u['username'] ?? '',
         'role': displayRole,
+        'children': childrenNames,
         'status': 'Aktif',
         'is_santri': false,
         'raw': u,
@@ -48,11 +62,16 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
     }).toList();
 
     final santrisMapped = rawSantris.map((s) {
+      // Find wali name linked to this child
+      final waliObj = s['wali'];
+      final String waliName = waliObj != null ? (waliObj['name'] ?? 'Belum terhubung') : 'Belum terhubung';
+
       return {
         'id': s['id'],
         'name': s['name'] ?? '',
         'nis': s['nis'] ?? '',
         'wali_id': s['wali_id'],
+        'wali_name': waliName,
         'qr_token': s['qr_token'] ?? '',
         'role': 'Santri',
         'status': 'Aktif',
@@ -118,6 +137,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                       if (!isEdit) ...[
                         DropdownButtonFormField<String>(
                           value: selectedRole,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'ROLE PENGGUNA',
                             labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
@@ -125,7 +145,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                             fillColor: const Color(0xFFF5F7F6),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                           ),
-                          items: ['Santri', 'Pengurus', 'Wali'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                          items: ['Santri', 'Pengurus', 'Wali'].map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) {
                             if (v != null) {
                               setDialogState(() => selectedRole = v);
@@ -172,6 +192,7 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                         // Wali Dropdown
                         DropdownButtonFormField<int>(
                           value: selectedWaliId,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'WALI SANTRI (ORANG TUA)',
                             labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
@@ -180,10 +201,19 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           items: [
-                            const DropdownMenuItem<int>(value: null, child: Text('Tanpa Wali (Belum terhubung)')),
+                            const DropdownMenuItem<int>(
+                              value: null,
+                              child: Text(
+                                'Tanpa Wali (Belum terhubung)',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             ..._waliList.map((w) => DropdownMenuItem<int>(
                                   value: w['id'],
-                                  child: Text(w['name']),
+                                  child: Text(
+                                    w['name']?.toString() ?? '',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 )),
                           ],
                           onChanged: (v) {
@@ -519,41 +549,69 @@ class _KelolaPenggunaScreenState extends State<KelolaPenggunaScreen> {
                                   user['name']!,
                                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: const Color(0xFF1E2925)),
                                 ),
-                                subtitle: Padding(
+                                 subtitle: Padding(
                                   padding: const EdgeInsets.only(top: 4.0),
-                                  child: Row(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE8F2EF), // visible background
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          user['role']!,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 11, 
-                                            color: AppColors.primaryDark, // highly visible dark color
-                                            fontWeight: FontWeight.w600,
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE8F2EF), // visible background
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              user['role']!,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11, 
+                                                color: AppColors.primaryDark, // highly visible dark color
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
                                           ),
-                                        ),
+                                          if (!isSantri) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              user['status']!,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11,
+                                                color: isActive ? AppColors.success : AppColors.error,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                      if (!isSantri) ...[
-                                        const SizedBox(width: 8),
+                                      const SizedBox(height: 6),
+                                      if (isSantri)
                                         Text(
-                                          user['status']!,
+                                          'Wali: ${user['wali_name']}',
                                           style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            color: isActive ? AppColors.success : AppColors.error,
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        )
+                                      else if (user['role'] == 'Wali')
+                                        Text(
+                                          'Anak: ${user['children']}',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                      ],
                                     ],
                                   ),
                                 ),
                                 trailing: PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert_rounded),
+                                  icon: const Icon(
+                                    Icons.more_vert_rounded,
+                                    color: AppColors.primaryDark,
+                                    size: 24,
+                                  ),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   onSelected: (val) {
                                     if (val == 'edit') {

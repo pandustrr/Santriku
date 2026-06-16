@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/auth/widgets/custom_text_field.dart';
+import 'package:santriku_app/features/wali/services/wali_service.dart';
 
 /// Halaman form pengajuan izin santri oleh Wali.
 class PengajuanIzinScreen extends StatefulWidget {
-  const PengajuanIzinScreen({super.key});
+  final List<Map<String, dynamic>>? santriList;
+  final int? initialSantriId;
+
+  const PengajuanIzinScreen({
+    super.key,
+    this.santriList,
+    this.initialSantriId,
+  });
 
   @override
   State<PengajuanIzinScreen> createState() => _PengajuanIzinScreenState();
@@ -18,9 +27,39 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
   final _tglSelesaiController = TextEditingController();
   bool _isLoading = false;
 
-  String? _selectedSantri;
-  final List<String> _santriList = ['Muhammad Fatih (IX A)', 'Aisyah (VII B)'];
-  bool _isFileUploaded = false;
+  int? _selectedSantriId;
+  String? _selectedJenisIzin = 'Sakit';
+  List<Map<String, dynamic>> _santriList = [];
+
+  XFile? _buktiFile;
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.santriList != null) {
+      _santriList = widget.santriList!;
+    }
+    _selectedSantriId = widget.initialSantriId;
+
+    if (_santriList.isEmpty) {
+      _loadSantris();
+    }
+  }
+
+  Future<void> _loadSantris() async {
+    setState(() => _isLoading = true);
+    final list = await WaliService.getSantris();
+    if (mounted) {
+      setState(() {
+        _santriList = list;
+        _isLoading = false;
+        if (_selectedSantriId == null && list.isNotEmpty) {
+          _selectedSantriId = list.first['id'];
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -30,9 +69,43 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
     super.dispose();
   }
 
-  void _submitIzin() {
+  String _formatDateToYmd(String dateStr) {
+    // Convert DD-MM-YYYY to YYYY-MM-DD
+    final parts = dateStr.split('-');
+    if (parts.length == 3) {
+      return "${parts[2]}-${parts[1]}-${parts[0]}";
+    }
+    return dateStr;
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        setState(() {
+          _buktiFile = image;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memilih gambar: $e')),
+      );
+    }
+  }
+
+  void _clearImage() {
+    setState(() {
+      _buktiFile = null;
+    });
+  }
+
+  void _submitIzin() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedSantri == null) {
+    if (_selectedSantriId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pilih santri terlebih dahulu!'), backgroundColor: AppColors.error),
       );
@@ -41,13 +114,25 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
 
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    final String tglMulaiYmd = _formatDateToYmd(_tglMulaiController.text);
+    final String tglSelesaiYmd = _formatDateToYmd(_tglSelesaiController.text);
 
+    final response = await WaliService.submitPermission(
+      santriId: _selectedSantriId!,
+      jenisIzin: _selectedJenisIzin ?? 'Sakit',
+      tanggalMulai: tglMulaiYmd,
+      tanggalSelesai: tglSelesaiYmd,
+      alasan: _alasanController.text,
+      buktiFile: _buktiFile,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (response['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Pengajuan izin berhasil dikirim!'),
+          content: Text(response['message'] ?? 'Pengajuan izin berhasil dikirim!'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -55,9 +140,19 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
           ),
         ),
       );
-
-      Navigator.of(context).pop();
-    });
+      Navigator.of(context).pop(true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response['message'] ?? 'Gagal mengirim pengajuan izin!'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
@@ -72,7 +167,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
             colorScheme: const ColorScheme.light(
               primary: AppColors.primaryDark,
               onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
+              onSurface: AppColors.primaryDarker,
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(foregroundColor: AppColors.primaryDark),
@@ -130,8 +225,8 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
                   const SizedBox(height: 28),
 
                   // Pilih Santri
-                  DropdownButtonFormField<String>(
-                    value: _selectedSantri,
+                  DropdownButtonFormField<int>(
+                    value: _selectedSantriId,
                     decoration: InputDecoration(
                       labelText: 'PILIH SANTRI',
                       labelStyle: GoogleFonts.poppins(
@@ -157,12 +252,51 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
                       ),
                     ),
                     items: _santriList.map((santri) {
-                      return DropdownMenuItem(
-                        value: santri,
-                        child: Text(santri, style: GoogleFonts.poppins(fontSize: 14)),
+                      return DropdownMenuItem<int>(
+                        value: santri['id'] as int,
+                        child: Text(
+                          santri['name'] ?? '',
+                          style: GoogleFonts.poppins(fontSize: 14),
+                        ),
                       );
                     }).toList(),
-                    onChanged: (val) => setState(() => _selectedSantri = val),
+                    onChanged: (val) => setState(() => _selectedSantriId = val),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Jenis Izin
+                  DropdownButtonFormField<String>(
+                    value: _selectedJenisIzin,
+                    decoration: InputDecoration(
+                      labelText: 'JENIS IZIN',
+                      labelStyle: GoogleFonts.poppins(
+                        color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.inputBackground,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.inputBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.inputBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Sakit', child: Text('Sakit')),
+                      DropdownMenuItem(value: 'Pulang', child: Text('Pulang / Izin Keluar')),
+                      DropdownMenuItem(value: 'Lainnya', child: Text('Lainnya')),
+                    ],
+                    onChanged: (val) => setState(() => _selectedJenisIzin = val),
                   ),
                   const SizedBox(height: 16),
 
@@ -206,7 +340,7 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Upload Surat Dokter / Berkas Pendukung Mock
+                  // Upload Bukti Pendukung
                   _buildUploadSection(),
                   const SizedBox(height: 40),
 
@@ -251,53 +385,65 @@ class _PengajuanIzinScreenState extends State<PengajuanIzinScreen> {
   }
 
   Widget _buildUploadSection() {
+    final bool hasFile = _buktiFile != null;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          setState(() { _isFileUploaded = !_isFileUploaded; });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isFileUploaded ? 'File berhasil dipilih (Simulasi)' : 'File dibatalkan (Simulasi)'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
+        onTap: _pickImage,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: _isFileUploaded ? const Color(0xFFE8F2EF) : AppColors.inputBackground,
+            color: hasFile ? const Color(0xFFE8F2EF) : AppColors.inputBackground,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _isFileUploaded ? const Color(0xFF2A8B72) : AppColors.inputBorder, style: BorderStyle.solid),
+            border: Border.all(
+              color: hasFile ? const Color(0xFF2A8B72) : AppColors.inputBorder,
+              style: BorderStyle.solid,
+            ),
           ),
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
           child: Column(
             children: [
               Icon(
-                _isFileUploaded ? Icons.check_circle_rounded : Icons.cloud_upload_outlined,
-                color: _isFileUploaded ? const Color(0xFF2A8B72) : AppColors.accent,
+                hasFile ? Icons.check_circle_rounded : Icons.cloud_upload_outlined,
+                color: hasFile ? const Color(0xFF2A8B72) : AppColors.accent,
                 size: 36,
               ),
               const SizedBox(height: 12),
               Text(
-                _isFileUploaded ? 'File Bukti_Dokter.pdf (1.2MB)' : 'Upload Bukti Pendukung (Opsional)',
+                hasFile
+                    ? 'Gambar terpilih: ${_buktiFile!.name}'
+                    : 'Upload Bukti Pendukung (Opsional)',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
-                  color: _isFileUploaded ? const Color(0xFF1E2925) : AppColors.textPrimary,
+                  color: hasFile ? const Color(0xFF1E2925) : AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
               ),
-              if (!_isFileUploaded) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Format PDF, JPG, atau PNG maks 2MB',
-                  style: GoogleFonts.poppins(
-                    color: AppColors.textHint,
-                    fontSize: 11,
+              const SizedBox(height: 4),
+              Text(
+                hasFile ? 'Klik untuk mengganti gambar' : 'Format JPG atau PNG maks 2MB',
+                style: GoogleFonts.poppins(
+                  color: AppColors.textHint,
+                  fontSize: 11,
+                ),
+              ),
+              if (hasFile) ...[
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: _clearImage,
+                  icon: const Icon(Icons.delete_forever, color: AppColors.error, size: 18),
+                  label: Text(
+                    'Hapus Bukti',
+                    style: GoogleFonts.poppins(
+                      color: AppColors.error,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ],
+              ]
             ],
           ),
         ),

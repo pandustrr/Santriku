@@ -1,14 +1,21 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:santriku_app/core/core.dart';
+import 'package:santriku_app/features/auth/services/auth_service.dart';
 import 'absensi_result_screen.dart';
+import 'package:santriku_app/features/admin/services/admin_service.dart';
 
 /// Halaman Scan QR Code untuk Absensi & Jatah Konsumsi.
-///
-/// Didesain interaktif dan presisi mengikuti Gambar 4.3 (Proses Scan QR Code).
+/// - Langsung buka kamera tanpa modal "Mode Pemindaian"
+/// - GPS wajib untuk absensi (geofence pesantren)
+/// - Upload QR dari galeri juga tersedia
 class ScanQrScreen extends StatefulWidget {
   final bool isAbsensi;
-
   const ScanQrScreen({super.key, required this.isAbsensi});
 
   @override
@@ -16,776 +23,713 @@ class ScanQrScreen extends StatefulWidget {
 }
 
 class _ScanQrScreenState extends State<ScanQrScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _laserController;
-  bool _hasScanned = false; // Mulai dalam mode belum scan
+    with WidgetsBindingObserver {
+  // ── State kamera ──────────────────────────────────────────
+  final MobileScannerController _cameraController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    torchEnabled: false,
+  );
+  bool _isTorchOn = false;
+  bool _isProcessing = false;
+
+  // ── State GPS & Settings ──────────────────────────────────
+  bool _isGpsLoading = true;
+  Position? _currentPosition;
+  String _locationLabel = 'Memuat pengaturan...';
+  bool _geofenceOk = false;
+  String? _gpsError;
+
+  double? _pesantrenLat;
+  double? _pesantrenLon;
+  double _geofenceRadius = 100.0;
+  String _locationName = 'Pesantren';
 
   @override
   void initState() {
     super.initState();
-    _laserController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    );
-    if (!_hasScanned) {
-      _laserController.repeat(reverse: true);
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.isAbsensi) {
+      _loadSettingsThenGps();
+    } else {
+      setState(() {
+        _isGpsLoading = false;
+        _locationLabel = 'GPS tidak diperlukan untuk konsumsi';
+        _geofenceOk = true;
+      });
     }
+  }
+
+  /// Ambil settings lokasi dari API admin, lalu inisialisasi GPS.
+  Future<void> _loadSettingsThenGps() async {
+    if (mounted) {
+      setState(() {
+        _isGpsLoading = true;
+        _locationLabel = 'Memuat pengaturan lokasi...';
+      });
+    }
+
+    try {
+      final settings = await AdminService.getSettings();
+      if (settings.isNotEmpty) {
+        _pesantrenLat = (settings['latitude'] as num?)?.toDouble();
+        _pesantrenLon = (settings['longitude'] as num?)?.toDouble();
+        _geofenceRadius = (settings['radius'] as num?)?.toDouble() ?? 100.0;
+        _locationName = settings['name']?.toString() ?? 'Pesantren';
+      }
+    } catch (_) {
+      // Jika gagal ambil settings, tetap lanjut GPS dengan koordinat null
+    }
+
+    await _initGps();
   }
 
   @override
   void dispose() {
-    _laserController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraController.dispose();
     super.dispose();
   }
 
-  void _triggerScanSimulation() {
-    _laserController.stop();
-    setState(() {
-      _hasScanned = true;
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_cameraController.value.isInitialized) return;
+    if (state == AppLifecycleState.resumed) {
+      _cameraController.start();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _cameraController.stop();
+    }
   }
 
-  void _resetScan() {
-    _laserController.repeat(reverse: true);
-    setState(() {
-      _hasScanned = false;
-    });
+  // ── GPS ───────────────────────────────────────────────────
+
+  Future<void> _initGps() async {
+    if (mounted) {
+      setState(() {
+        _isGpsLoading = true;
+        _gpsError = null;
+      });
+    }
+
+    try {
+      // 1. Cek layanan GPS aktif
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'GPS dinonaktifkan. Aktifkan GPS di pengaturan perangkat.';
+      }
+
+      // 2. Cek & minta izin
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Izin GPS ditolak. Scan absensi membutuhkan akses lokasi.';
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Izin GPS ditolak permanen.\nBuka Pengaturan > Aplikasi > Santriku > Izin Lokasi.';
+      }
+
+      // 3. Dapatkan posisi perangkat saat ini
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      // 4. Hitung jarak ke lokasi pesantren (koordinat dinamis dari API)
+      bool isOk = false;
+      String label;
+
+      if (_pesantrenLat != null && _pesantrenLon != null) {
+        final distance = Geolocator.distanceBetween(
+          _pesantrenLat!,
+          _pesantrenLon!,
+          position.latitude,
+          position.longitude,
+        );
+        isOk = distance <= _geofenceRadius;
+        label = isOk
+            ? '✓ Di dalam area $_locationName (${distance.toStringAsFixed(0)}m)'
+            : '✗ Di luar area $_locationName (${distance.toStringAsFixed(0)}m)';
+      } else {
+        // Koordinat belum tersedia dari server — tetap izinkan tapi beri info
+        isOk = true;
+        label = 'ℹ️ Lokasi: (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+          _geofenceOk = isOk;
+          _isGpsLoading = false;
+          _locationLabel = label;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGpsLoading = false;
+          _gpsError = e.toString();
+          _locationLabel = 'Gagal mendapatkan GPS';
+          _geofenceOk = false;
+        });
+      }
+    }
   }
 
-  void _saveData() {
-    final now = DateTime.now();
-    final formattedTime =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+  // ── QR Scan via kamera ────────────────────────────────────
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => AbsensiResultScreen(
-          isAbsensi: widget.isAbsensi,
-          santriName: 'Ahmad Fauzi',
-          status: widget.isAbsensi ? 'Hadir' : 'Makan Malam',
-          timestamp: formattedTime,
-          isSuccess: true,
-        ),
-      ),
-    );
+  void _onQrDetected(BarcodeCapture capture) {
+    if (_isProcessing) return;
+    final barcode = capture.barcodes.firstOrNull;
+    if (barcode == null || barcode.rawValue == null) return;
+    _processQrToken(barcode.rawValue!);
   }
+
+  // ── QR via upload gambar ──────────────────────────────────
+
+  Future<void> _pickQrFromGallery() async {
+    if (_isProcessing) return;
+    try {
+      _cameraController.stop();
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) {
+        _cameraController.start();
+        return;
+      }
+
+      final result = await MobileScannerController().analyzeImage(image.path);
+      _cameraController.start();
+
+      if (result == null || result.barcodes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'QR Code tidak terdeteksi pada gambar.',
+                style: GoogleFonts.poppins(),
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      final qrToken = result.barcodes.first.rawValue;
+      if (qrToken != null) {
+        _processQrToken(qrToken);
+      }
+    } catch (e) {
+      _cameraController.start();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membaca gambar: $e', style: GoogleFonts.poppins()),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Proses token QR ke API ────────────────────────────────
+
+  Future<void> _processQrToken(String qrToken) async {
+    if (_isProcessing) return;
+
+    // Untuk absensi: wajib ada GPS
+    if (widget.isAbsensi) {
+      if (_isGpsLoading) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Menunggu GPS... Harap tunggu.',
+                  style: GoogleFonts.poppins()),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+      if (_gpsError != null || _currentPosition == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('GPS belum tersedia: $_gpsError',
+                  style: GoogleFonts.poppins()),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      // Geofence check — beri peringatan tapi tetap lanjut (bisa disesuaikan)
+      if (!_geofenceOk) {
+        // Tampilkan dialog konfirmasi jika di luar area
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Di Luar Area Pesantren',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+            content: Text(
+              'Anda berada di luar area pesantren.\nAbsensi tetap akan dicatat dengan lokasi saat ini.',
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Batal', style: GoogleFonts.poppins()),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warning),
+                child: Text('Lanjutkan',
+                    style: GoogleFonts.poppins(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) {
+          _cameraController.start();
+          return;
+        }
+      }
+    }
+
+    if (mounted) setState(() => _isProcessing = true);
+    _cameraController.stop();
+
+    try {
+      final String urlPath = widget.isAbsensi ? 'attendance' : 'consumption';
+
+      final Map<String, dynamic> requestBody = widget.isAbsensi
+          ? {
+              'qr_token': qrToken,
+              'latitude': _currentPosition!.latitude,
+              'longitude': _currentPosition!.longitude,
+              'status': 'Hadir',
+            }
+          : {
+              'qr_token': qrToken,
+              'jenis_makan': _getJenisMakan(),
+            };
+
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}/pengurus/$urlPath'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${AuthService.token}',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      final data = jsonDecode(response.body);
+      final now = DateTime.now();
+      final formattedTime =
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        if (response.statusCode == 201) {
+          final displayName = widget.isAbsensi
+              ? (data['absensi']?['santri_name'] ?? 'Santri')
+              : (data['consumption']?['santri_name'] ?? 'Santri');
+          final displayStatus = widget.isAbsensi
+              ? (data['absensi']?['status'] ?? 'Hadir')
+              : 'Konsumsi Berhasil Dicatat';
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => AbsensiResultScreen(
+                isAbsensi: widget.isAbsensi,
+                santriName: displayName,
+                status: displayStatus,
+                timestamp: formattedTime,
+                isSuccess: true,
+              ),
+            ),
+          );
+        } else {
+          final errMsg = data['message'] ?? 'Proses gagal.';
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AbsensiResultScreen(
+                isAbsensi: widget.isAbsensi,
+                santriName: data['santri_name'] ?? '-',
+                status: errMsg,
+                timestamp: formattedTime,
+                isSuccess: false,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _cameraController.start();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Kesalahan jaringan: $e', style: GoogleFonts.poppins()),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getJenisMakan() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 10) return 'Sarapan';
+    if (hour >= 10 && hour < 15) return 'Siang';
+    return 'Malam';
+  }
+
+  // ── BUILD ─────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F6), // Background off-white
+      backgroundColor: Colors.black,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildCustomAppBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildScannerBox(),
-                    const SizedBox(height: 18),
-                    if (!_hasScanned) _buildSimulationTriggerCard(),
-                    if (_hasScanned) ...[
-                      if (widget.isAbsensi) _buildAbsensiDetails() else _buildKonsumsiDetails(),
-                      const SizedBox(height: 80), // Spacer untuk menghindari overlap button
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomSheet: _hasScanned ? _buildBottomSheetButtons() : null,
-    );
-  }
+            // ── Kamera fullscreen ─────────────────────────
+            _buildCameraView(),
 
-  // ── Custom AppBar ───────────────────────────────────────
-  Widget _buildCustomAppBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Padding(
-                padding: EdgeInsets.only(right: 2.0),
-                child: Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: Color(0xFF1E2925),
-                  size: 18,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Title & Subtitle
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.isAbsensi ? 'Absensi Santri' : 'Jatah Konsumsi',
-                style: GoogleFonts.poppins(
-                  color: const Color(0xFF1E2925),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                widget.isAbsensi ? 'Scan QR kartu santri' : 'Scan oleh Administrator',
-                style: GoogleFonts.poppins(
-                  color: Colors.grey[500],
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Scanner Box with Laser Animation ────────────────────
-  Widget _buildScannerBox() {
-    return Container(
-      width: double.infinity,
-      height: 180,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F2D26), // Dark green background
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Stack(
-        children: [
-          // Yellow Brackets (Bidik)
-          _buildScannerBrackets(),
-
-          // Laser Scanner line
-          if (!_hasScanned)
-            AnimatedBuilder(
-              animation: _laserController,
-              builder: (context, child) {
-                return Positioned(
-                  top: 24 + (_laserController.value * 132),
-                  left: 36,
-                  right: 36,
-                  child: Container(
-                    height: 2,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.6),
-                          blurRadius: 6,
-                          spreadRadius: 1.5,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-
-          // Center Bidik Overlay
-          Center(
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white24, width: 1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-
-          // Text Instruction inside Scanner Box
-          Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Text(
-              widget.isAbsensi ? 'Arahkan ke QR kartu santri' : 'Arahkan ke QR santri',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScannerBrackets() {
-    const double size = 20;
-    const double thick = 2.5;
-    const Color color = AppColors.accent;
-
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Stack(
-        children: [
-          // Top Left
-          Positioned(
-            top: 0,
-            left: 0,
-            child: Container(width: size, height: thick, color: color),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            child: Container(width: thick, height: size, color: color),
-          ),
-
-          // Top Right
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(width: size, height: thick, color: color),
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(width: thick, height: size, color: color),
-          ),
-
-          // Bottom Left
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: Container(width: size, height: thick, color: color),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: Container(width: thick, height: size, color: color),
-          ),
-
-          // Bottom Right
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(width: size, height: thick, color: color),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(width: thick, height: size, color: color),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Trigger Simulation Button Card ─────────────────────
-  Widget _buildSimulationTriggerCard() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.qr_code_scanner_rounded,
-            color: AppColors.accent,
-            size: 40,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Simulasikan Pemindaian',
-            style: GoogleFonts.poppins(
-              color: const Color(0xFF1E2925),
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Klik tombol di bawah untuk menyimulasikan pembacaan QR Code kartu santri.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              color: Colors.grey[500],
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _triggerScanSimulation,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF104A3E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Simulasi Scan QR',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Detail Absensi View (Left Screen) ──────────────────
-  Widget _buildAbsensiDetails() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Location Card
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F2EF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.location_on_outlined,
-                  color: Color(0xFF2A8B72),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'Gerbang Utama Pesantren',
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFF1E2925),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                'GPS OK',
-                style: GoogleFonts.poppins(
-                  color: const Color(0xFF2A8B72),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Section Title: SANTRI TERBACA
-        Text(
-          'SANTRI TERBACA',
-          style: GoogleFonts.poppins(
-            color: Colors.grey[500],
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Santri Profile Card
-        _buildSantriProfileCard(),
-
-        const SizedBox(height: 14),
-
-        // Checklist Status Items
-        _buildStatusCheckRow('QR kartu santri terbaca', true),
-        const SizedBox(height: 8),
-        _buildStatusCheckRow('Lokasi & Geofence sesuai', true),
-        const SizedBox(height: 8),
-        _buildStatusCheckRow('Waktu absen tercatat', true),
-      ],
-    );
-  }
-
-  // ── Detail Konsumsi View (Right Screen) ────────────────
-  Widget _buildKonsumsiDetails() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Santri Profile Card
-        _buildSantriProfileCard(),
-
-        const SizedBox(height: 24),
-
-        // Section Title: JATAH HARI INI
-        Text(
-          'JATAH HARI INI',
-          style: GoogleFonts.poppins(
-            color: Colors.grey[500],
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Meal Row
-        Row(
-          children: [
-            _buildMealItemCard('Sarapan', 'Diambil', Icons.local_cafe_outlined, true),
-            const SizedBox(width: 12),
-            _buildMealItemCard('Siang', 'Diambil', Icons.wb_sunny_outlined, true),
-            const SizedBox(width: 12),
-            _buildMealItemCard('Malam', 'Tersedia', Icons.nightlight_round_outlined, false),
-          ],
-        ),
-
-        const SizedBox(height: 18),
-
-        // Card Sisa Jatah
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A6B5A),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          padding: const EdgeInsets.all(18),
-          child: Stack(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'SISA JATAH',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white60,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '1',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        ' / 3',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white60,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              // Fork & Spoon background icon on the right
-              Positioned(
-                right: 0,
-                bottom: 0,
-                top: 0,
-                child: Icon(
-                  Icons.restaurant_rounded,
-                  color: Colors.white.withValues(alpha: 0.1),
-                  size: 48,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Helper Santri Profile Card
-  Widget _buildSantriProfileCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundColor: Color(0xFF1C6B59),
-            child: Text(
-              'A',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // ── Overlay UI ────────────────────────────────
+            Column(
               children: [
-                Text(
-                  'Ahmad Fauzi',
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFF1E2925),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                _buildTopBar(),
+                Expanded(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _buildScannerFrame(),
+                      if (widget.isAbsensi) _buildGpsIndicator(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'NIS 23.0142 • XI-A',
-                  style: GoogleFonts.poppins(
-                    color: Colors.grey[500],
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                _buildBottomBar(),
+              ],
+            ),
+
+            // ── Loading overlay ───────────────────────────
+            if (_isProcessing)
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppColors.accent),
+                      SizedBox(height: 16),
+                      Text('Memproses...', style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCameraView() {
+    return MobileScanner(
+      controller: _cameraController,
+      onDetect: _onQrDetected,
+      errorBuilder: (context, error, child) {
+        return Container(
+          color: Colors.black,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.camera_alt_outlined,
+                    color: Colors.white54, size: 64),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'Kamera tidak dapat diakses.\n${error.errorDetails?.message ?? 'Periksa izin kamera di pengaturan.'}',
+                    style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () => _cameraController.start(),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text('Coba Lagi',
+                      style: GoogleFonts.poppins(
+                          color: AppColors.primaryDarker,
+                          fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    minimumSize: const Size(160, 44),
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2A8B72),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.check_rounded,
-              color: Colors.white,
-              size: 14,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  // Helper Checklist Row
-  Widget _buildStatusCheckRow(String label, bool isOk) {
+  Widget _buildTopBar() {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
+        ),
+      ),
       child: Row(
         children: [
-          Icon(
-            isOk ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
-            color: isOk ? const Color(0xFF2A8B72) : Colors.red,
-            size: 20,
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              label,
+              widget.isAbsensi ? 'Scan QR Absensi' : 'Scan QR Konsumsi',
               style: GoogleFonts.poppins(
-                color: const Color(0xFF1E2925),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            isOk ? 'OK' : 'ERROR',
-            style: GoogleFonts.poppins(
-              color: isOk ? const Color(0xFF2A8B72) : Colors.red,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper Meal Item Card Builder
-  Widget _buildMealItemCard(String meal, String status, IconData icon, bool isTaken) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isTaken ? const Color(0xFFE8F2EF) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: isTaken ? null : Border.all(color: Colors.grey[200]!),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isTaken ? const Color(0xFF2A8B72) : Colors.grey[400],
-              size: 22,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              meal,
-              style: GoogleFonts.poppins(
-                color: isTaken ? const Color(0xFF1E2925) : Colors.grey[700],
-                fontSize: 12,
+                color: Colors.white,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              status,
-              style: GoogleFonts.poppins(
-                color: isTaken ? const Color(0xFF2A8B72) : Colors.grey[400],
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+          ),
+          // Senter
+          IconButton(
+            onPressed: () {
+              _cameraController.toggleTorch();
+              setState(() => _isTorchOn = !_isTorchOn);
+            },
+            icon: Icon(
+              _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              color: _isTorchOn ? AppColors.accent : Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannerFrame() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Judul scan
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            widget.isAbsensi
+                ? '📋 Arahkan ke QR Absensi Santri'
+                : '🍽️ Arahkan ke QR Konsumsi Santri',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Bingkai scan
+        Container(
+          width: 240,
+          height: 240,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.accent, width: 3),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Stack(
+            children: [
+              Positioned(top: -1.5, left: -1.5, child: _corner(isTop: true, isLeft: true)),
+              Positioned(top: -1.5, right: -1.5, child: _corner(isTop: true, isLeft: false)),
+              Positioned(bottom: -1.5, left: -1.5, child: _corner(isTop: false, isLeft: true)),
+              Positioned(bottom: -1.5, right: -1.5, child: _corner(isTop: false, isLeft: false)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Posisikan QR Code di dalam bingkai',
+          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+        ),
+      ],
+    );
+  }
+
+  Widget _corner({required bool isTop, required bool isLeft}) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        border: Border(
+          top: isTop ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+          bottom: !isTop ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+          left: isLeft ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+          right: !isLeft ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+        ),
+        borderRadius: BorderRadius.only(
+          topLeft: (isTop && isLeft) ? const Radius.circular(8) : Radius.zero,
+          topRight: (isTop && !isLeft) ? const Radius.circular(8) : Radius.zero,
+          bottomLeft: (!isTop && isLeft) ? const Radius.circular(8) : Radius.zero,
+          bottomRight: (!isTop && !isLeft) ? const Radius.circular(8) : Radius.zero,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGpsIndicator() {
+    Color bgColor;
+    Color textColor;
+    IconData icon;
+
+    if (_isGpsLoading) {
+      bgColor = Colors.black54;
+      textColor = Colors.white70;
+      icon = Icons.gps_not_fixed_rounded;
+    } else if (_gpsError != null) {
+      bgColor = AppColors.error.withValues(alpha: 0.9);
+      textColor = Colors.white;
+      icon = Icons.gps_off_rounded;
+    } else if (_geofenceOk) {
+      bgColor = AppColors.success.withValues(alpha: 0.9);
+      textColor = Colors.white;
+      icon = Icons.gps_fixed_rounded;
+    } else {
+      bgColor = AppColors.warning.withValues(alpha: 0.9);
+      textColor = Colors.white;
+      icon = Icons.location_off_rounded;
+    }
+
+    return Positioned(
+      top: 20,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _isGpsLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Icon(icon, color: textColor, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _locationLabel,
+                style: GoogleFonts.poppins(
+                    color: textColor, fontSize: 12, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (_gpsError != null)
+              GestureDetector(
+                onTap: _initGps,
+                child: Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('Coba Lagi',
+                      style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  // ── Bottom Sheet Action Buttons ─────────────────────────
-  Widget _buildBottomSheetButtons() {
+  Widget _buildBottomBar() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 20),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black.withValues(alpha: 0.85), Colors.transparent],
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Left Small Button
-          ElevatedButton(
-            onPressed: widget.isAbsensi
-                ? _resetScan
-                : () {
-                    // Tolak jatah konsumsi — navigasi ke result gagal
-                    final now = DateTime.now();
-                    final formattedTime =
-                        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => AbsensiResultScreen(
-                          isAbsensi: false,
-                          santriName: 'Ahmad Fauzi',
-                          status: 'Ditolak',
-                          timestamp: formattedTime,
-                          isSuccess: false,
-                        ),
-                      ),
-                    );
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: widget.isAbsensi ? const Color(0xFFF0F2F1) : const Color(0xFFFDE8E8),
-              foregroundColor: widget.isAbsensi ? const Color(0xFF1E2925) : AppColors.error,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          // Peringatan geofence
+          if (widget.isAbsensi && !_isGpsLoading && !_geofenceOk && _gpsError == null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.6)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: AppColors.warning, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Di luar area pesantren. Tap QR tetap bisa mencatat absensi.',
+                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.isAbsensi) ...[
-                  const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Scan Lain',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ] else ...[
-                  const Icon(Icons.close_rounded, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Tolak',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ]
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
 
-          // Right Large Expanded Button
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _saveData,
-              icon: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
-              label: Text(
-                widget.isAbsensi ? 'Simpan Absen' : 'Ambil Jatah Malam',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
+          // Tombol upload QR dari galeri
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isProcessing ? null : _pickQrFromGallery,
+                  icon: const Icon(Icons.image_outlined, color: Colors.white),
+                  label: Text(
+                    widget.isAbsensi ? 'Upload QR Absensi' : 'Upload QR Konsumsi',
+                    style: GoogleFonts.poppins(
+                        color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white54),
+                    minimumSize: const Size(0, 48),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: widget.isAbsensi ? const Color(0xFF1A6B5A) : const Color(0xFF2A8B72),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
+            ],
           ),
         ],
       ),
