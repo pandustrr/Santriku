@@ -135,7 +135,7 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
               onSurface: Colors.white,
               secondaryContainer: AppColors.accent.withValues(alpha: 0.3),
               onSecondaryContainer: Colors.white,
-              surfaceVariant: AppColors.primaryDarker,
+              surfaceContainerHighest: AppColors.primaryDarker,
               onSurfaceVariant: Colors.white,
               outline: AppColors.accent.withValues(alpha: 0.5),
             ),
@@ -434,22 +434,7 @@ class _LogAktivitasScreenState extends State<LogAktivitasScreen> {
                           },
                         ),
                       ),
-<<<<<<< HEAD
-                    ),
-                    trailing: Text(
-                      '${10 + index}:20',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-=======
->>>>>>> e71c638dd9843a9acc3567b77b5e7f3da8fbb551
+
           ),
         ],
       ),

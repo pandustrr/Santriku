@@ -9,7 +9,7 @@ import 'package:excel/excel.dart';
 import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/auth/services/auth_service.dart';
 import 'package:universal_html/html.dart' as html;
-import 'package:open_file_plus/open_file_plus.dart';
+import 'package:open_filex/open_filex.dart';
 
 class LaporanKonsumsiScreen extends StatefulWidget {
   const LaporanKonsumsiScreen({super.key});
@@ -171,7 +171,7 @@ class _LaporanKonsumsiScreenState extends State<LaporanKonsumsiScreen> {
         await File(filePath).writeAsBytes(fileBytes);
 
         // Langsung buka
-        await OpenFile.open(filePath);
+        await OpenFilex.open(filePath);
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -187,7 +187,7 @@ class _LaporanKonsumsiScreenState extends State<LaporanKonsumsiScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    OpenFile.open(filePath);
+                    OpenFilex.open(filePath);
                   },
                   child: const Text(
                     'BUKA',
