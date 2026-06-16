@@ -347,7 +347,7 @@ class _WaliDashboardScreenState extends State<WaliDashboardScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 12,
-      childAspectRatio: 0.9,
+      childAspectRatio: 1.1,
       children: [
         _buildStatusItem(context, 'Absensi', absensi, Icons.check_circle_rounded, absensiColor),
         _buildStatusItem(context, 'Makan Harian', makan, Icons.restaurant_rounded, AppColors.accent),
@@ -390,28 +390,35 @@ class _WaliDashboardScreenState extends State<WaliDashboardScreen> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, color: color, size: 28),
-                const SizedBox(height: 12),
+                Icon(icon, color: color, size: 22),
+                const SizedBox(height: 6),
                 Text(
                   title,
                   style: GoogleFonts.poppins(
                     color: AppColors.textSecondary,
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w500,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: GoogleFonts.poppins(
                     color: AppColors.textPrimary,
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

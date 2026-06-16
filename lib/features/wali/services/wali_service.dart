@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:santriku_app/core/core.dart';
 import 'package:santriku_app/features/auth/services/auth_service.dart';
@@ -79,7 +79,7 @@ class WaliService {
     required String tanggalMulai,
     required String tanggalSelesai,
     required String alasan,
-    File? buktiFile,
+    XFile? buktiFile,
   }) async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/wali/santri/$santriId/permissions');
@@ -95,10 +95,12 @@ class WaliService {
       request.fields['alasan'] = alasan;
 
       // Add file if exists
-      if (buktiFile != null && await buktiFile.exists()) {
-        final multipartFile = await http.MultipartFile.fromPath(
+      if (buktiFile != null) {
+        final bytes = await buktiFile.readAsBytes();
+        final multipartFile = http.MultipartFile.fromBytes(
           'bukti',
-          buktiFile.path,
+          bytes,
+          filename: buktiFile.name,
         );
         request.files.add(multipartFile);
       }

@@ -180,7 +180,7 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
                                   image: NetworkImage(
                                     widget.permission['bukti_path'].startsWith('http')
                                         ? widget.permission['bukti_path']
-                                        : '${ApiConstants.baseUrl}/${widget.permission['bukti_path']}',
+                                        : '${ApiConstants.baseUrl.replaceAll('/api', '')}/storage/${widget.permission['bukti_path']}',
                                   ),
                                   fit: BoxFit.cover,
                                 ),
